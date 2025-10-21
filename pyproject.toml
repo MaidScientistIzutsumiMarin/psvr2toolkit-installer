@@ -1,21 +1,10 @@
 [project]
 name = "psvr2-helper"
 version = "0.0.1"
-description = "A tool that can install and configure various software for the PSVR2."
-readme = "README.md"
 requires-python = ">= 3.14"
 dependencies = [
+  "SteamPathFinder",
   "nicegui",
+  "requests",
   # "pywebview",
 ]
-
-[project.urls]
-Funding = "https://ko-fi.com/maidscientistizutsumimarin"
-Source = "https://github.com/MaidScientistIzutsumiMarin/tumblrbot"
-
-[project.scripts]
-psvr2-helper = "psvr2_helper.__main__:main"
-
-[build-system]
-requires = ["flit_core"]
-build-backend = "flit_core.buildapi"
