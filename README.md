@@ -1,8 +1,8 @@
-# psvr2-helper
+# psvr2toolkit-installer
 
 [PlayStation VR2 Toolkit]: https://github.com/BnuuySolutions/PSVR2Toolkit
 
-A tool that can install and configure various software for the PSVR2.
+An unofficial tool that can install and configure the PlayStation VR2 Toolkit.
 
 **Planned Features:**
 
