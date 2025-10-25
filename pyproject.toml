@@ -1,5 +1,5 @@
 [project]
-name = "psvr2-helper"
+name = "psvr2toolkit-installer"
 version = "0.1.0"
 requires-python = ">= 3.14"
 dependencies = [
