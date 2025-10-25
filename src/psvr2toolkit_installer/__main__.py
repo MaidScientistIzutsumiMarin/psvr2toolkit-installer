@@ -1,6 +1,7 @@
 from functools import partial
 from pathlib import Path
 from random import choice
+from sys import exit as sys_exit
 from time import sleep
 from typing import get_args
 from urllib.request import urlopen
@@ -82,4 +83,9 @@ class Root:
         self.install_toolkit_button.enable()
 
 
-run(Root, dark=None, native=True, reload=False)
+def main() -> None:
+    run(Root, dark=None, native=True, reload=False)
+
+
+if __name__ == "__main__":
+    sys_exit(main())
