@@ -30,7 +30,7 @@ class Root:
                 self.install_toolkit_button = self.create_modify_toolkit_button("Install")
                 self.uninstall_toolkit_button = self.create_modify_toolkit_button("Uninstall")
             with root_splitter.after:
-                checkbox("Enable Experimental Eye Tracking")
+                checkbox("Enable Experimental Eye Tracking").tooltip("Not implemented yet... sowwy").disable()
 
         self.log = log()
 
