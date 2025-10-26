@@ -2,6 +2,7 @@
 
 [PlayStation VR2 App]: https://store.steampowered.com/app/2580190/PlayStationVR2_App
 [PlayStation VR2 Toolkit]: https://github.com/BnuuySolutions/PSVR2Toolkit
+[![PyPI - Version](https://img.shields.io/pypi/v/psvr2toolkit-installer)](https://python.org/pypi/psvr2toolkit-installer)
 
 An unofficial tool that can install and configure the PlayStation VR2 Toolkit.
 
