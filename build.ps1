@@ -9,6 +9,6 @@ Invoke-NiceGUIPack
 Move-Item dist\psvr2toolkit-installer.7z .
 Invoke-NiceGUIPack -OneFile
 Move-Item dist\psvr2toolkit-installer\* .
-#flit.exe publish
+flit.exe publish
 Remove-Item build, dist -Recurse -ErrorAction SilentlyContinue
 Pause
