@@ -6,12 +6,15 @@
 An unofficial tool that can install and configure the PlayStation VR2 Toolkit.
 
 **Planned Features:**
+✅: Available in the current release.
+📈: Available in the next release.
 
 - ✅ A user interface.
 - ✅ Installation button for [PlayStation VR2 Toolkit].
-  - Handle [PlayStation®VR2 App] updates.
-- Uninstallation button for [PlayStation VR2 Toolkit].
+  - 📈 Handle [PlayStation®VR2 App] state change.
+- 📈 Uninstallation button for [PlayStation VR2 Toolkit].
 - Options to toggle experimental eye-tracking.
 - Update checkers for:
   - this tool.
   - [PlayStation VR2 Toolkit].
+- (Probably) Use an async library for HTTP requests.
