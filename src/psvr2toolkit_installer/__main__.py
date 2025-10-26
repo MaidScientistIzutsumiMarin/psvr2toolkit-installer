@@ -1,50 +1,34 @@
-from contextlib import contextmanager
+from functools import partial
 from pathlib import Path
 from sys import exit as sys_exit
-from typing import TYPE_CHECKING
+from typing import Literal
 from urllib.request import urlopen
-from webbrowser import open as webbrowser_open
 
 from nicegui import app
-from nicegui.ui import button, card, checkbox, dialog, label, log, notification, row, run, space, splitter  # pyright: ignore[reportUnknownVariableType]
+from nicegui.ui import button, checkbox, log, row, run, space, splitter  # pyright: ignore[reportUnknownVariableType]
+from signify.authenticode import AuthenticodeFile, AuthenticodeVerificationResult
 from SteamPathFinder import get_game_path, get_steam_path
 
-if TYPE_CHECKING:
-    from collections.abc import Generator
-
-    from nicegui.elements.mixins.disableable_element import DisableableElement
-
-PLAYSTATION_VR2_APP = "2580190"
-
-
-@contextmanager
-def disable(*buttons: DisableableElement) -> Generator[None]:
-    for b in buttons:
-        b.disable()
-    try:
-        yield
-    finally:
-        for b in buttons:
-            b.enable()
+type Verb = Literal["Install", "Uninstall"]
 
 
 def get_driver_paths() -> tuple[Path, Path]:
-    driver_path = Path(get_game_path(get_steam_path(), PLAYSTATION_VR2_APP, "PlayStation VR2 App")) / "SteamVR_Plug-In" / "bin" / "win64" / "driver_playstation_vr2.dll"
+    driver_path = Path(get_game_path(get_steam_path(), "2580190", "PlayStation VR2 App")) / "SteamVR_Plug-In" / "bin" / "win64" / "driver_playstation_vr2.dll"
     return driver_path, driver_path.with_name("driver_playstation_vr2_orig.dll")
+
+
+def is_driver_signed(driver_path: Path) -> bool:
+    with driver_path.open("rb") as fp:
+        file = AuthenticodeFile.from_stream(fp)
+        return file.explain_verify()[0] is AuthenticodeVerificationResult.OK
 
 
 class Root:
     def __init__(self) -> None:
-        with dialog() as self.app_dialog, card().classes("w-full"):
-            label("It appears the PlayStation®VR2 App is not installed.")
-            label("This is required for installing the Toolkit driver!").classes("text-warning")
-            with row(align_items="center"):
-                button("Install PlayStation®VR2 App", on_click=self.install_app)
-
         with splitter().classes("w-full") as root_splitter:
             with root_splitter.before:
-                self.install_toolkit_button = button("Install PlayStation VR2 Toolkit", on_click=self.install_toolkit)
-                self.uninstall_toolkit_button = button("Uninstall PlayStation VR2 Toolkit", on_click=self.uninstall_toolkit)
+                self.install_toolkit_button = self.create_modify_toolkit_button("Install")
+                self.uninstall_toolkit_button = self.create_modify_toolkit_button("Uninstall")
             with root_splitter.after:
                 checkbox("Enable Experimental Eye Tracking")
 
@@ -54,46 +38,51 @@ class Root:
             space()
             button("Quit", on_click=app.shutdown)
 
-    async def install_app(self) -> None:
-        self.app_dialog.close()
-        notification("Installing the PlayStation®VR2 App...", spinner=True)
-        webbrowser_open(f"steam://install/{PLAYSTATION_VR2_APP}")
+    def create_modify_toolkit_button(self, verb: Verb) -> button:
+        return button(f"{verb} PSVR2 Toolkit", on_click=partial(self.modify_toolkit, verb))
 
-    async def install_toolkit(self) -> None:
-        with disable(self.install_toolkit_button, self.uninstall_toolkit_button):
-            try:
-                driver_path, backup_driver_path = get_driver_paths()
-                self.log.push(f"Starting installation...\nFound a driver at {driver_path}.")
-                if backup_driver_path.exists():
-                    self.log.push(f"The Toolkit driver has already been installed. {backup_driver_path.name} will not be touched.", classes="text-warning")
-                else:
-                    driver_path.rename(backup_driver_path)
-                    self.log.push(f"Moved the Sony driver to {backup_driver_path.name}.")
+    async def modify_toolkit(self, verb: Verb) -> None:
+        self.install_toolkit_button.disable()
+        self.uninstall_toolkit_button.disable()
 
-                self.log.push("Downloading the latest Toolkit driver...")
-                with urlopen("https://github.com/BnuuySolutions/PSVR2Toolkit/releases/latest/download/driver_playstation_vr2.dll") as response:  # noqa: ASYNC210
-                    driver_path.write_bytes(response.read())
+        try:
+            driver_paths = get_driver_paths()
+            self.log.clear()
+            self.log.push(f"Starting {verb}...")
+            self.log.push("Installed driver: {}\nBackup driver: {}".format(*driver_paths), classes="text-grey")
 
-                self.log.push(f"Saved the Toolkit driver as {driver_path.name}.")
-                self.log.push("Installation succeeded!", classes="text-positive")
-            except FileNotFoundError:
-                self.app_dialog.open()
-            except Exception as exc:  # noqa: BLE001
-                self.log.push(f"Installation failed!\n{exc}", classes="text-negative")
+            if verb == "Install":
+                await self.install_toolkit(*get_driver_paths())
+            else:
+                await self.uninstall_toolkit(*get_driver_paths())
 
-    async def uninstall_toolkit(self) -> None:
-        with disable(self.install_toolkit_button, self.uninstall_toolkit_button):
-            try:
-                driver_path, backup_driver_path = get_driver_paths()
-                self.log.push(f"Starting uninstallation...\nFound a driver at {driver_path}.")
-                if backup_driver_path.exists():
-                    backup_driver_path.replace(driver_path)
-                    self.log.push(f"Moved the Sony driver to {driver_path.name} and deleted backup.")
-                    self.log.push("Uninstallation succeeded!", classes="text-positive")
-                else:
-                    self.log.push(f"Could not find a Sony driver at {backup_driver_path.name}!\nThe Toolkit driver has probably not been installed.\nAborting uninstallation; no changes have been made!", classes="text-negative")
-            except Exception as exc:  # noqa: BLE001
-                self.log.push(f"Uninstallation failed!\n{exc}", classes="text-negative")
+            self.log.push(f"{verb} succeeded!", classes="text-positive")
+        except Exception as exc:  # noqa: BLE001
+            self.log.push(f"{verb} failed!\n{exc}", classes="text-negative")
+        finally:
+            self.install_toolkit_button.enable()
+            self.uninstall_toolkit_button.enable()
+
+    async def install_toolkit(self, driver_path: Path, backup_driver_path: Path) -> None:
+        if is_driver_signed(driver_path):
+            driver_path.replace(backup_driver_path)
+            self.log.push("Backed up the installed driver.")
+        else:
+            self.log.push("PSVR2 Toolkit has already been installed. The backup driver will not be touched.", classes="text-warning")
+
+        self.log.push("Downloading the latest PSVR2 Toolkit release...")
+        with urlopen("https://github.com/BnuuySolutions/PSVR2Toolkit/releases/latest/download/driver_playstation_vr2.dll") as response:  # noqa: ASYNC210
+            driver_path.write_bytes(response.read())
+
+    async def uninstall_toolkit(self, driver_path: Path, backup_driver_path: Path) -> None:
+        if not is_driver_signed(driver_path) or driver_path.stat().st_mtime < backup_driver_path.stat().st_mtime:
+            backup_driver_path.replace(driver_path)
+            self.log.push("Restored the backup driver.")
+        else:
+            self.log.push("The installed driver is newer than the backup driver. Only deleting the backup driver.", classes="text-warning")
+            backup_driver_path.unlink()
+
+        self.log.push("It is recommended to verify PSVR2 App files through Steam.", classes="text-bold")
 
 
 def main() -> None:
