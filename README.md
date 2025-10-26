@@ -11,10 +11,10 @@ An unofficial tool that can install and configure the PlayStation VR2 Toolkit.
 
 - ✅ A user interface.
 - ✅ Installation button for [PlayStation VR2 Toolkit].
-  - 📈 Handle [PlayStation VR2 App] state change.
 - 📈 Uninstallation button for [PlayStation VR2 Toolkit].
+- 📈 Handle [PlayStation VR2 App] state changes.
 - Options to toggle experimental eye-tracking.
 - Update checkers for:
-  - this tool.
-  - [PlayStation VR2 Toolkit].
+  - PSVR2Toolkit-Installer
+  - [PlayStation VR2 Toolkit]
 - (Probably) Use an async library for HTTP requests.
