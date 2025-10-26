@@ -5,10 +5,9 @@ function Invoke-NiceGUIPack {
 }
 
 Invoke-NiceGUIPack
-7z.exe a dist\psvr2toolkit-installer
-Move-Item dist\psvr2toolkit-installer.7z .
+7z.exe a psvr2toolkit-installer dist\psvr2toolkit-installer
 Invoke-NiceGUIPack -OneFile
-Move-Item dist\psvr2toolkit-installer\* .
+Move-Item dist\* .
 flit.exe publish
 Remove-Item build, dist -Recurse -ErrorAction SilentlyContinue
 Pause
