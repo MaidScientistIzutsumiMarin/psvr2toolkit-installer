@@ -30,7 +30,7 @@ class Root:
                 self = cast("Root", args[0])
 
                 self.enabled = False
-                notify = ui.notification(f"{verb}...", spinner=True, timeout=None)
+                notification = ui.notification(f"{verb}...", spinner=True, timeout=None)
 
                 try:
                     self.log.push("---", classes="text-accent")
@@ -43,9 +43,9 @@ class Root:
                     self.log.push(f"{verb} failed!\n{exc}", classes="text-negative")
                     raise
                 finally:
-                    notify.message = f"{verb} done!"
-                    notify.spinner = False
-                    notify.timeout = 5
+                    notification.message = f"{verb} done!"
+                    notification.spinner = False
+                    notification.timeout = 5
                     self.enabled = True
 
             return wrapper
@@ -67,12 +67,12 @@ class Root:
             yield fp
 
     def __post_init__(self) -> None:
-        with ui.splitter().classes("w-full") as root_splitter:
-            with root_splitter.before:
+        with ui.splitter().classes("w-full") as splitter:
+            with splitter.before:
                 ui.button("Install PSVR2 Toolkit", on_click=self.install_toolkit).bind_enabled_from(self)
                 ui.button("Uninstall PSVR2 Toolkit", on_click=self.uninstall_toolkit).bind_enabled_from(self)
 
-            with root_splitter.after:
+            with splitter.after:
                 ui.checkbox("Enable Experimental Eyelid Estimation", value=self.is_eyelid_estimation_enabled, on_change=self.toggle_eyelid_estimation).bind_enabled_from(self).bind_value_from(self, "is_eyelid_estimation_enabled")
 
         self.log = ui.log()
