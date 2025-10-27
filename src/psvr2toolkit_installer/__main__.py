@@ -1,93 +1,150 @@
-from functools import partial
+from contextlib import contextmanager
+from functools import wraps
+from json import dump, load
 from pathlib import Path
-from sys import exit as sys_exit
-from typing import Literal
+from typing import TYPE_CHECKING, Any, cast
 from urllib.request import urlopen
 
-from nicegui import app
-from nicegui.ui import button, checkbox, log, row, run, space, splitter  # pyright: ignore[reportUnknownVariableType]
+from nicegui import app, ui
+from nicegui.binding import bindable_dataclass
+from nicegui.events import ValueChangeEventArguments  # noqa: TC002 Not sure why this is necessary, but it is.
 from signify.authenticode import AuthenticodeFile, AuthenticodeVerificationResult
 from SteamPathFinder import get_game_path, get_steam_path
 
-type Verb = Literal["Install", "Uninstall"]
+if TYPE_CHECKING:
+    from _io import TextIOWrapper
+    from collections.abc import Awaitable, Callable, Generator
 
 
-def get_driver_paths() -> tuple[Path, Path]:
-    driver_path = Path(get_game_path(get_steam_path(), "2580190", "PlayStation VR2 App")) / "SteamVR_Plug-In" / "bin" / "win64" / "driver_playstation_vr2.dll"
-    return driver_path, driver_path.with_name("driver_playstation_vr2_orig.dll")
-
-
-def is_driver_signed(driver_path: Path) -> bool:
-    with driver_path.open("rb") as fp:
-        file = AuthenticodeFile.from_stream(fp)
-        return file.explain_verify()[0] is AuthenticodeVerificationResult.OK
-
-
+@bindable_dataclass
 class Root:
-    def __init__(self) -> None:
-        with splitter().classes("w-full") as root_splitter:
+    enabled: bool = True
+
+    @staticmethod
+    def modifies_installation[**P](verb: str) -> Callable[[Callable[P, Awaitable[object]]], Callable[P, Awaitable[None]]]:
+        # Takes an str in the decorator syntax, which then returns the function decorator, which then wraps the function and does its things.
+        # The typing is very scary, we know.
+        def decorator(function: Callable[P, Awaitable[object]]) -> Callable[P, Awaitable[None]]:
+            @wraps(function)
+            async def wrapper(*args: P.args, **kwargs: P.kwargs) -> None:
+                self = cast("Root", args[0])
+
+                self.enabled = False
+                notify = ui.notification(f"{verb}...", spinner=True, timeout=None)
+
+                try:
+                    self.log.push("---", classes="text-accent")
+                    self.log.push(f"{verb} starting...")
+
+                    await function(*args, **kwargs)
+
+                    self.log.push(f"{verb} succeeded!", classes="text-positive")
+                except Exception as exc:
+                    self.log.push(f"{verb} failed!\n{exc}", classes="text-negative")
+                    raise
+                finally:
+                    notify.message = f"{verb} done!"
+                    notify.spinner = False
+                    notify.timeout = 5
+                    self.enabled = True
+
+            return wrapper
+
+        return decorator
+
+    @staticmethod
+    def get_driver_information() -> tuple[Path, Path, bool]:
+        installed_driver_path = Path(get_game_path(get_steam_path(), "2580190", "PlayStation VR2 App")) / "SteamVR_Plug-In" / "bin" / "win64" / "driver_playstation_vr2.dll"
+
+        with installed_driver_path.open("rb") as fp:
+            file = AuthenticodeFile.from_stream(fp)
+            return installed_driver_path, installed_driver_path.with_name("driver_playstation_vr2_orig.dll"), file.explain_verify()[0] is AuthenticodeVerificationResult.OK
+
+    @staticmethod
+    @contextmanager
+    def open_steamvr_settings() -> Generator[TextIOWrapper]:
+        with (Path(get_steam_path()) / "config" / "steamvr.vrsettings").open("r+", encoding="utf-8") as fp:
+            yield fp
+
+    def __post_init__(self) -> None:
+        with ui.splitter().classes("w-full") as root_splitter:
             with root_splitter.before:
-                self.install_toolkit_button = self.create_modify_toolkit_button("Install")
-                self.uninstall_toolkit_button = self.create_modify_toolkit_button("Uninstall")
+                ui.button("Install PSVR2 Toolkit", on_click=self.install_toolkit).bind_enabled_from(self)
+                ui.button("Uninstall PSVR2 Toolkit", on_click=self.uninstall_toolkit).bind_enabled_from(self)
+
             with root_splitter.after:
-                checkbox("Enable Experimental Eye Tracking").tooltip("Not implemented yet... sowwy").disable()
+                ui.checkbox("Enable Experimental Eyelid Estimation", value=self.is_eyelid_estimation_enabled, on_change=self.toggle_eyelid_estimation).bind_enabled_from(self).bind_value_from(self, "is_eyelid_estimation_enabled")
 
-        self.log = log()
+        self.log = ui.log()
 
-        with row().classes("w-full"):
-            space()
-            button("Quit", on_click=app.shutdown)
+        with ui.row().classes("w-full"):
+            ui.space()
+            ui.button("Quit", on_click=app.shutdown)
 
-    def create_modify_toolkit_button(self, verb: Verb) -> button:
-        return button(f"{verb} PSVR2 Toolkit", on_click=partial(self.modify_toolkit, verb))
+    @property
+    def is_eyelid_estimation_enabled(self) -> bool:
+        with self.open_steamvr_settings() as fp:
+            data: dict[str, dict[str, Any]] = load(fp)
+        return data.get("playstation_vr2_ex", {}).get("enableEyelidEstimation", False)
 
-    async def modify_toolkit(self, verb: Verb) -> None:
-        self.install_toolkit_button.disable()
-        self.uninstall_toolkit_button.disable()
+    @modifies_installation("PSVR2 Toolkit installation")
+    async def install_toolkit(self) -> None:
+        installed_driver_path, orig_driver_path, driver_signed = self.get_driver_information()
 
-        try:
-            driver_paths = get_driver_paths()
-            self.log.clear()
-            self.log.push(f"Starting {verb}...")
-            self.log.push("Installed driver: {}\nBackup driver: {}".format(*driver_paths), classes="text-grey")
-
-            if verb == "Install":
-                await self.install_toolkit(*get_driver_paths())
-            else:
-                await self.uninstall_toolkit(*get_driver_paths())
-
-            self.log.push(f"{verb} succeeded!", classes="text-positive")
-        except Exception as exc:  # noqa: BLE001
-            self.log.push(f"{verb} failed!\n{exc}", classes="text-negative")
-        finally:
-            self.install_toolkit_button.enable()
-            self.uninstall_toolkit_button.enable()
-
-    async def install_toolkit(self, driver_path: Path, backup_driver_path: Path) -> None:
-        if is_driver_signed(driver_path):
-            driver_path.replace(backup_driver_path)
-            self.log.push("Backed up the installed driver.")
-        else:
-            self.log.push("PSVR2 Toolkit has already been installed. The backup driver will not be touched.", classes="text-warning")
+        if driver_signed:
+            self.log.push("Copying the installed driver...")
+            installed_driver_path.replace(orig_driver_path)
+        elif not orig_driver_path.exists():
+            msg = "Error: The PSVR2 App has invalid files. Please verify its integrity."
+            raise RuntimeError(msg)
 
         self.log.push("Downloading the latest PSVR2 Toolkit release...")
         with urlopen("https://github.com/BnuuySolutions/PSVR2Toolkit/releases/latest/download/driver_playstation_vr2.dll") as response:  # noqa: ASYNC210
-            driver_path.write_bytes(response.read())
+            self.log.push("Installing the downloaded driver...")
+            installed_driver_path.write_bytes(response.read())
 
-    async def uninstall_toolkit(self, driver_path: Path, backup_driver_path: Path) -> None:
-        if not is_driver_signed(driver_path) or driver_path.stat().st_mtime < backup_driver_path.stat().st_mtime:
-            backup_driver_path.replace(driver_path)
-            self.log.push("Restored the backup driver.")
+    @modifies_installation("PSVR2 Toolkit uninstallation")
+    async def uninstall_toolkit(self) -> None:
+        installed_driver_path, orig_driver_path, driver_signed = self.get_driver_information()
+
+        if not driver_signed or installed_driver_path.stat().st_mtime < orig_driver_path.stat().st_mtime:
+            self.log.push("Restoring the original driver...")
+            orig_driver_path.replace(installed_driver_path)
         else:
-            self.log.push("The installed driver is newer than the backup driver. Only deleting the backup driver.", classes="text-warning")
-            backup_driver_path.unlink()
+            self.log.push("The installed driver is newer than the original driver. Only deleting the original driver...", classes="text-warning")
+            orig_driver_path.unlink()
 
         self.log.push("It is recommended to verify PSVR2 App files through Steam.", classes="text-bold")
 
+    @modifies_installation("Toggling eyelid estimation")
+    async def toggle_eyelid_estimation(self, handler: ValueChangeEventArguments) -> None:
+        self.log.push("Loading SteamVR settings...")
+        with self.open_steamvr_settings() as fp:
+            data: dict[str, dict[str, object]] = load(fp)
+
+            self.log.push("Modifying SteamVR settings...")
+            if handler.value:
+                data["playstation_vr2_ex"] = {"enableEyelidEstimation": True}
+            else:
+                del data["playstation_vr2_ex"]
+
+            self.log.push("Saving modified SteamVR settings...")
+
+            # Seek to the start of the file then truncate to clear it.
+            fp.seek(0)
+            fp.truncate()
+
+            # Don't know if ensure_ascii is necessary.
+            # indent probably isn't as long as Steam has a normal JSON reader.
+            # But this maintains the original structure as much as possible.
+            dump(data, fp, ensure_ascii=False, indent=3)
+
 
 def main() -> None:
-    run(Root, dark=None, native=True, reload=False)
-
-
-if __name__ == "__main__":
-    sys_exit(main())
+    ui.run(  # pyright: ignore[reportUnknownMemberType]
+        Root,
+        title="PSVR2Toolkit Installer",
+        dark=None,
+        native=True,
+        reload=False,
+    )
