@@ -66,6 +66,12 @@ class Root:
         with (Path(get_steam_path()) / "config" / "steamvr.vrsettings").open("r+", encoding="utf-8") as fp:
             yield fp
 
+    @classmethod
+    def is_eyelid_estimation_enabled(cls) -> bool:
+        with cls.open_steamvr_settings() as fp:
+            data: dict[str, dict[str, Any]] = load(fp)
+        return data.get("playstation_vr2_ex", {}).get("enableEyelidEstimation", False)
+
     def __post_init__(self) -> None:
         with ui.splitter().classes("w-full") as splitter:
             with splitter.before:
@@ -80,12 +86,6 @@ class Root:
         with ui.row().classes("w-full"):
             ui.space()
             ui.button("Quit", on_click=app.shutdown)
-
-    @classmethod
-    def is_eyelid_estimation_enabled(cls) -> bool:
-        with cls.open_steamvr_settings() as fp:
-            data: dict[str, dict[str, Any]] = load(fp)
-        return data.get("playstation_vr2_ex", {}).get("enableEyelidEstimation", False)
 
     @modifies_installation("PSVR2 Toolkit installation")
     async def install_toolkit(self) -> None:
