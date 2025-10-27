@@ -73,7 +73,7 @@ class Root:
                 ui.button("Uninstall PSVR2 Toolkit", on_click=self.uninstall_toolkit).bind_enabled_from(self)
 
             with splitter.after:
-                ui.checkbox("Enable Experimental Eyelid Estimation", value=self.is_eyelid_estimation_enabled, on_change=self.toggle_eyelid_estimation).bind_enabled_from(self).bind_value_from(self, "is_eyelid_estimation_enabled")
+                ui.checkbox("Enable Experimental Eyelid Estimation", value=self.is_eyelid_estimation_enabled(), on_change=self.toggle_eyelid_estimation).bind_enabled_from(self)
 
         self.log = ui.log()
 
@@ -81,9 +81,9 @@ class Root:
             ui.space()
             ui.button("Quit", on_click=app.shutdown)
 
-    @property
-    def is_eyelid_estimation_enabled(self) -> bool:
-        with self.open_steamvr_settings() as fp:
+    @classmethod
+    def is_eyelid_estimation_enabled(cls) -> bool:
+        with cls.open_steamvr_settings() as fp:
             data: dict[str, dict[str, Any]] = load(fp)
         return data.get("playstation_vr2_ex", {}).get("enableEyelidEstimation", False)
 
