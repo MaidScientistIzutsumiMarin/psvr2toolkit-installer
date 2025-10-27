@@ -3,8 +3,8 @@ from functools import wraps
 from json import dump, load
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
-from urllib.request import urlopen
 
+from aiohttp import ClientSession
 from nicegui import app, ui
 from nicegui.binding import bindable_dataclass
 from nicegui.events import ValueChangeEventArguments  # noqa: TC002 Not sure why this is necessary, but it is.
@@ -99,9 +99,9 @@ class Root:
             raise RuntimeError(msg)
 
         self.log.push("Downloading the latest PSVR2 Toolkit release...")
-        with urlopen("https://github.com/BnuuySolutions/PSVR2Toolkit/releases/latest/download/driver_playstation_vr2.dll") as response:  # noqa: ASYNC210
+        async with ClientSession(raise_for_status=True) as session, session.get("https://github.com/BnuuySolutions/PSVR2Toolkit/releases/latest/download/driver_playstation_vr2.dll") as response:
             self.log.push("Installing the downloaded driver...")
-            installed_driver_path.write_bytes(response.read())
+            installed_driver_path.write_bytes(await response.read())
 
     @modifies_installation("PSVR2 Toolkit uninstallation")
     async def uninstall_toolkit(self) -> None:
