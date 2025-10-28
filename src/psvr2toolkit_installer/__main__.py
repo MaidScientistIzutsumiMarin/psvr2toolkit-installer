@@ -133,7 +133,7 @@ class Root:
             ui.button("Check for Updates", on_click=self.check_for_updates).bind_enabled_from(self)
             ui.spinner(size="1.5em").bind_visibility_from(self, "spinner_visible")
             ui.space()
-            ui.button("Quit", on_click=app.shutdown)
+            ui.button("Quit", on_click=app.shutdown).bind_enabled_from(self)
 
     @modifies_installation(f"{PSVR2_TOOLKIT_NAME} installation")
     async def install_toolkit(self) -> None:
