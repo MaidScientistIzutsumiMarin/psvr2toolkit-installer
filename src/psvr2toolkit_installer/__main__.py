@@ -212,7 +212,7 @@ class Root:
                     PSVR2_TOOLKIT_INSTALLER_NAME,
                     release,
                     partial(webbrowser_open, release.html_url),
-                    up_to_date=__version__ == release.tag_name[1:],  # Trim the 'v'
+                    up_to_date=__version__ == release.tag_name.lstrip("v"),
                 )
 
             self.update_dialog.open()
