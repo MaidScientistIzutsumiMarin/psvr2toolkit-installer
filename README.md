@@ -5,7 +5,7 @@
 
 An unofficial tool that can install and configure the PlayStation VR2 Toolkit.
 
-**Planned Features:**
+**Features:**
 ✅: Current release
 📈: Next release
 
