@@ -104,17 +104,15 @@ class Root:
             with splitter.before:
                 ui.button(f"Install {PSVR2_TOOLKIT}", on_click=self.install_toolkit).bind_enabled_from(self)
                 ui.button(f"Uninstall {PSVR2_TOOLKIT}", on_click=self.uninstall_toolkit).bind_enabled_from(self)
-                ui.separator()
-                with ui.row(align_items="center"):
-                    ui.button("Check for Updates", on_click=partial(io_bound, self.check_for_updates)).bind_enabled_from(self)
-                    ui.spinner(size="2em").bind_visibility_from(self, "spinner_visible")
 
             with splitter.after:
                 ui.checkbox("Enable Experimental Eyelid Estimation", value=self.is_eyelid_estimation_enabled(), on_change=self.toggle_eyelid_estimation).bind_enabled_from(self)
 
         self.log = ui.log()
 
-        with ui.row().classes("w-full"):
+        with ui.row(align_items="center").classes("w-full"):
+            ui.button("Check for Updates", on_click=partial(io_bound, self.check_for_updates)).bind_enabled_from(self)
+            ui.spinner(size="1.5em").bind_visibility_from(self, "spinner_visible")
             ui.space()
             ui.button("Quit", on_click=app.shutdown)
 
