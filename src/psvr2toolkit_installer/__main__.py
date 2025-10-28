@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from aiofiles.threadpool.text import AsyncTextIOWrapper
     from githubkit.rest import Release
 
-__version__ = "0.2.0"
+__version__ = "1.0.0"
 
 PSVR2_APP = "PlayStation VR2 App"
 STEAMVR = "SteamVR"
@@ -239,7 +239,6 @@ def main() -> None:
         Root().create_ui,
         title=PSVR2_TOOLKIT_INSTALLER_NAME,
         dark=None,
-        native=True,
         window_size=(650, 500),
         reload=False,
     )
