@@ -41,6 +41,12 @@ PSVR2_TOOLKIT_OWNER = "BnuuySolutions"
 PSVR2_TOOLKIT_NAME = "PSVR2Toolkit"
 
 
+@asynccontextmanager
+async def open_steamvr_settings() -> AsyncGenerator[AsyncTextIOWrapper]:
+    async with aiofiles_open(Path(get_steam_path()) / "config" / "steamvr.vrsettings", "r+", encoding="utf-8") as fp:
+        yield fp
+
+
 def modifies_installation[**P](verb: str) -> Callable[[Callable[P, Awaitable[object]]], Callable[P, Awaitable[None]]]:
     # Takes an str in the decorator syntax, which then returns the function decorator, which then wraps the function and does its things.
     # The typing is very scary, we know.
@@ -71,12 +77,6 @@ def modifies_installation[**P](verb: str) -> Callable[[Callable[P, Awaitable[obj
         return wrapper
 
     return decorator
-
-
-@asynccontextmanager
-async def open_steamvr_settings() -> AsyncGenerator[AsyncTextIOWrapper]:
-    async with aiofiles_open(Path(get_steam_path()) / "config" / "steamvr.vrsettings", "r+", encoding="utf-8") as fp:
-        yield fp
 
 
 async def is_eyelid_estimation_enabled() -> bool:
