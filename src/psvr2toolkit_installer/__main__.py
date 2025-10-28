@@ -13,10 +13,9 @@ from aiofiles import open as aiofiles_open
 from aiofiles.os import replace, stat, unlink
 from aiofiles.ospath import exists
 from githubkit import GitHub, UnauthAuthStrategy
-from githubkit.versions.v2022_11_28.models.group_0376 import Release
 from nicegui import app, ui
 from nicegui.binding import bindable_dataclass
-from nicegui.events import ClickEventArguments, Handler, ValueChangeEventArguments  # noqa: TC002 Not sure why this is necessary, but it is.
+from nicegui.events import ValueChangeEventArguments  # noqa: TC002
 from signify.authenticode import AuthenticodeFile, AuthenticodeVerificationResult
 from SteamPathFinder import get_game_path, get_steam_path
 
@@ -25,6 +24,7 @@ if TYPE_CHECKING:
 
     from aiofiles.threadpool.text import AsyncTextIOWrapper
     from githubkit.rest import Release
+    from nicegui.events import ClickEventArguments, Handler
 
 __version__ = "1.0.0"
 
