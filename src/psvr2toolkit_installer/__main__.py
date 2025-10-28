@@ -7,6 +7,7 @@ from hmac import compare_digest
 from json import dump, load
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
+from webbrowser import open as webbrowser_open
 
 from aiohttp import ClientSession
 from github import Github
@@ -173,7 +174,7 @@ class Root:
         self.update_dialog.clear()
 
         try:
-            with self.update_dialog, ui.card(), ui.grid(columns="auto 1fr 2fr").classes("items-center"), Github(lazy=True) as github:
+            with self.update_dialog, ui.card(), ui.grid(columns=3).classes("items-center"), Github(lazy=True) as github:
                 release = github.get_repo("BnuuySolutions/PSVR2Toolkit").get_latest_release()
                 for asset in release.assets:
                     if asset.digest is not None and asset.name == "driver_playstation_vr2.dll":
@@ -189,7 +190,7 @@ class Root:
                 self.show_update(
                     PSVR2_TOOLKIT_INSTALLER,
                     release,
-                    None,
+                    partial(webbrowser_open, release.html_url),
                     has_update=__version__ != release.tag_name.lstrip("v"),
                 )
 
@@ -203,13 +204,15 @@ class Root:
     def show_update(self, name: str, release: GitRelease, on_click: Handler[ClickEventArguments] | None, *, has_update: bool) -> None:
         ui.label(name).classes("font-bold")
         ui.label(release.tag_name).classes("text-secondary")
-        ui.button("Update", on_click=on_click).set_enabled(has_update)
+        ui.button("Update", on_click=on_click).set_enabled(not has_update)
+        with ui.expansion("Changelog").classes("col-span-full"):
+            ui.markdown(release.body)
 
 
 def main() -> None:
     ui.run(  # pyright: ignore[reportUnknownMemberType]
         Root,
-        title="PSVR2Toolkit Installer",
+        title=PSVR2_TOOLKIT_INSTALLER,
         dark=None,
         native=True,
         reload=False,
