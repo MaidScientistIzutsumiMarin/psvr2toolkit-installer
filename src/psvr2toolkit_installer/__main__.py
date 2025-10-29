@@ -1,28 +1,24 @@
-from contextlib import asynccontextmanager
-from dataclasses import dataclass
 from functools import partial, wraps
 from hashlib import sha256
 from hmac import compare_digest
 from json import dumps, loads
 from operator import and_
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Self, cast
+from typing import TYPE_CHECKING, ClassVar, cast
 from webbrowser import open as webbrowser_open
 
 from aiofiles import open as aiofiles_open
 from aiofiles.os import replace, stat, unlink
 from aiofiles.ospath import exists
-from githubkit import GitHub, UnauthAuthStrategy
+from githubkit import GitHub
 from nicegui import app, ui
 from nicegui.binding import bindable_dataclass
-from nicegui.events import ValueChangeEventArguments  # noqa: TC002
 from signify.authenticode import AuthenticodeFile, AuthenticodeVerificationResult
 from SteamPathFinder import get_game_path, get_steam_path
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Awaitable, Callable
+    from collections.abc import Awaitable, Callable
 
-    from aiofiles.threadpool.text import AsyncTextIOWrapper
     from githubkit.rest import Release
     from nicegui.events import ClickEventArguments, Handler
 
@@ -41,91 +37,112 @@ PSVR2_TOOLKIT_OWNER = "BnuuySolutions"
 PSVR2_TOOLKIT_NAME = "PSVR2Toolkit"
 
 
-@asynccontextmanager
-async def open_steamvr_settings() -> AsyncGenerator[AsyncTextIOWrapper]:
-    async with aiofiles_open(Path(get_steam_path()) / "config" / "steamvr.vrsettings", "r+", encoding="utf-8") as fp:
-        yield fp
+class Drivers:
+    installed_path: ClassVar = Path(get_game_path(get_steam_path(), "2580190", PSVR2_APP)) / "SteamVR_Plug-In" / "bin" / "win64" / "driver_playstation_vr2.dll"
+    original_path: ClassVar = installed_path.with_name("driver_playstation_vr2_orig.dll")
 
-
-def modifies_installation[**P](verb: str) -> Callable[[Callable[P, Awaitable[object]]], Callable[P, Awaitable[None]]]:
-    # Takes an str in the decorator syntax, which then returns the function decorator, which then wraps the function and does its things.
-    # The typing is very scary, we know.
-    def decorator(function: Callable[P, Awaitable[object]]) -> Callable[P, Awaitable[None]]:
-        @wraps(function)
-        async def wrapper(*args: P.args, **kwargs: P.kwargs) -> None:
-            self = cast("Root", args[0])
-            notification = ui.notification(f"{verb}...", spinner=True, timeout=None)
-
-            try:
-                self.enabled = False
-
-                self.log.clear()
-                self.log.push(f"{verb} starting...")
-
-                await function(*args, **kwargs)
-
-                self.log.push(f"{verb} succeeded!", classes="text-positive")
-            except Exception as exc:
-                self.log.push(f"{verb} failed!\n{exc}", classes="text-negative")
-                raise
-            finally:
-                notification.message = f"{verb} done!"
-                notification.spinner = False
-                notification.timeout = 5
-                self.enabled = True
-
-        return wrapper
-
-    return decorator
-
-
-async def is_eyelid_estimation_enabled() -> bool:
-    async with open_steamvr_settings() as fp:
-        data: dict[str, dict[str, Any]] = loads(await fp.read())
-    return data.get(PSVR2_SETTINGS_KEY, {}).get(EYELID_ESIMATION_KEY, False)
-
-
-async def get_mtime(path: Path) -> float:
-    stats = await stat(path)
-    return stats.st_mtime
-
-
-@dataclass
-class DriverInfo:
-    installed_path: Path
-    original_path: Path
-    signed: bool
+    @staticmethod
+    async def get_mtime(path: Path) -> float:
+        stats = await stat(path)
+        return stats.st_mtime
 
     @classmethod
-    async def get(cls) -> Self:
-        installed_path = Path(get_game_path(get_steam_path(), "2580190", PSVR2_APP)) / "SteamVR_Plug-In" / "bin" / "win64" / "driver_playstation_vr2.dll"
+    async def is_installed_driver_newer(cls) -> bool:
+        # Signed is true if the installed driver exists, and the signature can be verified.
+        if signed := await exists(cls.installed_path):
+            async with aiofiles_open(cls.installed_path, "rb") as fp:
+                signed = AuthenticodeFile.from_stream(fp.raw).explain_verify()[0] is AuthenticodeVerificationResult.OK
 
-        async with aiofiles_open(installed_path, "rb") as fp:
-            file = AuthenticodeFile.from_stream(fp.raw)
+        original_exists = await exists(cls.original_path)
 
-            return cls(
-                installed_path,
-                installed_path.with_name("driver_playstation_vr2_orig.dll"),
-                file.explain_verify()[0] is AuthenticodeVerificationResult.OK,
-            )
+        # If the installed driver is not signed, and there is no original driver, the installation is fucked.
+        if not signed and not original_exists:
+            msg = f"Error: {PSVR2_APP} has invalid files. Please verify its integrity."
+            raise RuntimeError(msg)
+
+        # If the installed driver is signed, and it was modified more recently than the original driver, the installed driver is probably a newer version.
+        # Alternatively, if the installed driver is signed, and there is no original driver, the install is normal.
+        return signed and (not original_exists or await cls.get_mtime(cls.installed_path) > await cls.get_mtime(cls.original_path))
+
+
+class SteamVR:
+    settings_path: ClassVar = Path(get_steam_path()) / "config" / "steamvr.vrsettings"
+
+    @classmethod
+    async def load_settings(cls) -> dict[str, dict[str, str | float | bool]]:
+        async with aiofiles_open(cls.settings_path, "rb") as fp:
+            return loads(await fp.read())
+
+    @classmethod
+    async def is_eyelid_estimation_enabled(cls) -> bool:
+        data = await cls.load_settings()
+        return bool(data.get(PSVR2_SETTINGS_KEY, {}).get(EYELID_ESIMATION_KEY, False))
+
+    @classmethod
+    async def set_eyelid_estimation_enabled(cls, *, enabled: bool) -> None:
+        data = await cls.load_settings()
+
+        if enabled:
+            data[PSVR2_SETTINGS_KEY] = {EYELID_ESIMATION_KEY: True}
+        else:
+            del data[PSVR2_SETTINGS_KEY]
+
+        async with aiofiles_open(cls.settings_path, "w", encoding="utf-8") as fp:
+            await fp.write(dumps(data, ensure_ascii=False, indent=3))
 
 
 @bindable_dataclass
 class Root:
-    github: GitHub[UnauthAuthStrategy] = GitHub()
+    github: ClassVar = GitHub()
+
     enabled = True
     spinner_visible = False
 
-    async def create_ui(self) -> None:
+    @staticmethod
+    def modifies_installation[**P](verb: str) -> Callable[[Callable[P, Awaitable[object]]], Callable[P, Awaitable[None]]]:
+        # Takes an str in the decorator syntax, which then returns the function decorator, which then wraps the function and does its things.
+        # The typing is very scary, we know.
+        def decorator(function: Callable[P, Awaitable[object]]) -> Callable[P, Awaitable[None]]:
+            @wraps(function)
+            async def wrapper(*args: P.args, **kwargs: P.kwargs) -> None:
+                self = cast("Root", args[0])
+                notification = ui.notification(f"{verb}...", spinner=True, timeout=None)
+
+                try:
+                    self.enabled = False
+
+                    self.log.clear()
+                    self.log.push(f"{verb} starting...")
+
+                    await function(*args, **kwargs)
+
+                    self.log.push(f"{verb} succeeded!", classes="text-positive")
+                except Exception as exc:
+                    self.log.push(f"{verb} failed!\n{exc}", classes="text-negative")
+                    raise
+                finally:
+                    notification.message = f"{verb} done!"
+                    notification.spinner = False
+                    notification.timeout = 5
+                    self.enabled = True
+
+            return wrapper
+
+        return decorator
+
+    async def setup(self) -> None:
         self.update_dialog = ui.dialog()
 
         with ui.splitter().classes("w-full") as splitter:
             with splitter.before:
                 ui.button(f"Install {PSVR2_TOOLKIT_NAME}", on_click=self.install_toolkit).bind_enabled_from(self)
                 ui.button(f"Uninstall {PSVR2_TOOLKIT_NAME}", on_click=self.uninstall_toolkit).bind_enabled_from(self)
-
             with splitter.after:
-                ui.checkbox("Enable Experimental Eyelid Estimation", value=await is_eyelid_estimation_enabled(), on_change=self.toggle_eyelid_estimation).bind_enabled_from(self)
+                ui.checkbox(
+                    "Enable Experimental Eyelid Estimation",
+                    value=await SteamVR.is_eyelid_estimation_enabled(),
+                    on_change=lambda args: SteamVR.set_eyelid_estimation_enabled(enabled=args.value),
+                ).bind_enabled_from(self)
 
         self.log = ui.log()
 
@@ -137,14 +154,9 @@ class Root:
 
     @modifies_installation(f"{PSVR2_TOOLKIT_NAME} installation")
     async def install_toolkit(self) -> None:
-        driver_info = await DriverInfo.get()
-
-        if driver_info.signed:
+        if await Drivers.is_installed_driver_newer():
             self.log.push("Copying the installed driver...")
-            await replace(driver_info.installed_path, driver_info.original_path)
-        elif not await exists(driver_info.original_path):
-            msg = f"Error: The {PSVR2_APP} has invalid files. Please verify its integrity."
-            raise RuntimeError(msg)
+            await replace(Drivers.installed_path, Drivers.original_path)
 
         self.log.push(f"Downloading the latest {PSVR2_TOOLKIT_NAME} release...")
         async with GitHub() as github, github.get_async_client() as client:
@@ -152,54 +164,27 @@ class Root:
             response = await client.get(release.assets[0].browser_download_url)
 
             self.log.push("Installing the downloaded driver...")
-            async with aiofiles_open(driver_info.installed_path, "wb") as fp:
+            async with aiofiles_open(Drivers.installed_path, "wb") as fp:
                 await fp.write(await response.aread())
 
     @modifies_installation(f"{PSVR2_TOOLKIT_NAME} uninstallation")
     async def uninstall_toolkit(self) -> None:
-        driver_info = await DriverInfo.get()
-
-        if not driver_info.signed or await get_mtime(driver_info.installed_path) < await get_mtime(driver_info.original_path):
-            self.log.push("Restoring the original driver...")
-            await replace(driver_info.original_path, driver_info.installed_path)
+        if await Drivers.is_installed_driver_newer():
+            self.log.push("The installed driver is newer than the original driver.\nOnly deleting the original driver...", classes="text-warning")
+            await unlink(Drivers.original_path)
         else:
-            self.log.push("The installed driver is newer than the original driver. Only deleting the original driver...", classes="text-warning")
-            await unlink(driver_info.original_path)
+            self.log.push("Restoring the original driver...")
+            await replace(Drivers.original_path, Drivers.installed_path)
 
         self.log.push(f"It is recommended to verify {PSVR2_APP} files through Steam.", classes="text-bold")
 
-    @modifies_installation("Toggling eyelid estimation")
-    async def toggle_eyelid_estimation(self, handler: ValueChangeEventArguments) -> None:
-        self.log.push(f"Loading {STEAMVR} settings...")
-        async with open_steamvr_settings() as fp:
-            data: dict[str, dict[str, object]] = loads(await fp.read())
-
-            self.log.push(f"Modifying {STEAMVR} settings...")
-            if handler.value:
-                data[PSVR2_SETTINGS_KEY] = {EYELID_ESIMATION_KEY: True}
-            else:
-                del data[PSVR2_SETTINGS_KEY]
-
-            self.log.push(f"Saving modified {STEAMVR} settings...")
-
-            # Seek to the start of the file then truncate to clear it.
-            await fp.seek(0)
-            await fp.truncate()
-
-            # Don't know if ensure_ascii is necessary.
-            # indent probably isn't as long as Steam has a normal JSON reader.
-            # But this maintains the original structure as much as possible.
-            await fp.write(dumps(data, ensure_ascii=False, indent=3))
-
     async def check_for_updates(self) -> None:
         try:
-            driver_info = await DriverInfo.get()
-
             self.spinner_visible = True
             self.update_dialog.clear()
             with self.update_dialog, ui.card(), ui.grid(columns=3).classes("items-center"):
                 release = await self.get_latest_release(PSVR2_TOOLKIT_OWNER, PSVR2_TOOLKIT_NAME)
-                async with aiofiles_open(driver_info.installed_path, "rb") as fp:
+                async with aiofiles_open(Drivers.installed_path, "rb") as fp:
                     self.show_update(
                         PSVR2_TOOLKIT_NAME,
                         release,
@@ -236,7 +221,7 @@ class Root:
 
 def main() -> None:
     ui.run(  # pyright: ignore[reportUnknownMemberType]
-        Root().create_ui,
+        Root().setup,
         title=PSVR2_TOOLKIT_INSTALLER_NAME,
         dark=None,
         window_size=(650, 500),
