@@ -171,8 +171,12 @@ class Root:
             await function("")
 
     async def set_eyelid_estimation(self, args: ValueChangeEventArguments) -> None:
-        await SteamVR.set_eyelid_estimation_enabled(enabled=args.value)
-        notify(f"{'Enabled' if args.value else 'Disabled'} eyelid estimation!")
+        try:
+            await SteamVR.set_eyelid_estimation_enabled(enabled=args.value)
+            notify(f"{'Enabled' if args.value else 'Disabled'} eyelid estimation!")
+        except Exception as exc:
+            self.log.push(f"Setting eyelid estimation failed!\n{exc}", classes="text-negative")
+            raise
 
     @modifies_installation
     async def install_toolkit(self) -> None:
