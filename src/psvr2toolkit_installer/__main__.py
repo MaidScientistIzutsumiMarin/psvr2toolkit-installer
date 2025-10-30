@@ -5,16 +5,17 @@ from hmac import compare_digest
 from json import dumps, loads
 from operator import and_
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, Literal
 from webbrowser import open as webbrowser_open
 
 from aiofiles import open as aiofiles_open
 from aiofiles.os import replace, stat, unlink
 from aiofiles.ospath import exists
 from githubkit import GitHub
-from nicegui import app, ui
+from nicegui import app
 from nicegui.binding import bindable_dataclass
 from nicegui.events import ValueChangeEventArguments  # noqa: TC002
+from nicegui.ui import button, card, checkbox, dialog, expansion, grid, label, log, markdown, notification, notify, refreshable_method, row, run, space, spinner, splitter  # pyright: ignore[reportUnknownVariableType]
 from signify.authenticode import AuthenticodeFile, AuthenticodeVerificationResult
 from SteamPathFinder import get_game_path, get_steam_path
 
@@ -101,14 +102,14 @@ class Root:
     setting_up = True
 
     @staticmethod
-    def modifies_installation(function: Callable[[Root], Awaitable[None]]) -> ui.refreshable_method[Root, [str], CoroutineType[object, object, None]]:
-        @ui.refreshable_method
+    def modifies_installation(function: Callable[[Root], Awaitable[None]]) -> refreshable_method[Root, [str], CoroutineType[object, object, None]]:
+        @refreshable_method
         async def wrapper(self: Root, verb: str) -> None:
             with self.working():
                 if self.setting_up:
                     return
 
-                notification = ui.notification(f"{verb}...", spinner=True, timeout=None)
+                work_notification = notification(f"{verb}...", spinner=True, timeout=None)
 
                 try:
                     self.log.clear()
@@ -117,59 +118,61 @@ class Root:
                     await function(self)
 
                     self.log.push(f"{verb} succeeded!", classes="text-positive")
-                except Exception as exc:
-                    self.log.push(f"{verb} failed!\n{exc}", classes="text-negative")
-                    raise
                 finally:
-                    notification.message = f"{verb} done!"
-                    notification.spinner = False
-                    notification.timeout = 5
+                    work_notification.message = f"{verb} done!"
+                    work_notification.spinner = False
+                    work_notification.timeout = 5
 
         return wrapper
 
     @contextmanager
     def working(self) -> Generator[None]:
         self.enabled = False
-        spinner = ui.spinner(size="1.5em")
+        work_spinner = spinner(size="1.5em")
 
         try:
             yield
+        except Exception as exc:
+            self.log.push(f"Operation failed!\n{exc}", classes="text-negative")
+            raise
         finally:
-            spinner.set_visibility(False)
+            work_spinner.set_visibility(False)
             self.enabled = True
 
     async def setup(self) -> None:
-        with ui.splitter().classes("w-full") as splitter:
-            with splitter.before:
-                with ui.row(align_items="center"):
-                    ui.button(f"Install {PSVR2_TOOLKIT_NAME}", on_click=partial(self.install_toolkit.refresh, f"{PSVR2_TOOLKIT_NAME} installation")).bind_enabled_from(self)
-                    await self.install_toolkit("")
+        with splitter().classes("w-full") as root_splitter:
+            with root_splitter.before:
+                await self.create_modification_button("Install")
+                await self.create_modification_button("Uninstall")
 
-                with ui.row(align_items="center"):
-                    ui.button(f"Uninstall {PSVR2_TOOLKIT_NAME}", on_click=partial(self.uninstall_toolkit.refresh, f"{PSVR2_TOOLKIT_NAME} uninstallation")).bind_enabled_from(self)
-                    await self.uninstall_toolkit("")
-
-            with splitter.after:
-                ui.checkbox(
+            with root_splitter.after:
+                checkbox(
                     "Enable Experimental Eyelid Estimation",
                     value=await SteamVR.is_eyelid_estimation_enabled(),
                     on_change=self.set_eyelid_estimation,
                 ).bind_enabled_from(self)
 
-        self.log = ui.log()
+        self.log = log()
 
-        with ui.row(align_items="center").classes("w-full"):
-            ui.button("Check for Updates", on_click=self.check_for_updates.refresh).bind_enabled_from(self)
+        with row(align_items="center").classes("w-full"):
+            button("Check for Updates", on_click=self.check_for_updates.refresh).bind_enabled_from(self)
             await self.check_for_updates()
 
-            ui.space()
-            ui.button("Quit", on_click=app.shutdown).bind_enabled_from(self)
+            space()
+            button("Quit", on_click=app.shutdown).bind_enabled_from(self)
 
         self.setting_up = False
 
+    async def create_modification_button(self, verb: Literal["Install", "Uninstall"]) -> None:
+        function = self.install_toolkit if verb == "Install" else self.uninstall_toolkit
+
+        with row(align_items="center"):
+            button(f"{verb} {PSVR2_TOOLKIT_NAME}", on_click=partial(function.refresh, f"{PSVR2_TOOLKIT_NAME} {verb}")).bind_enabled_from(self)
+            await function("")
+
     async def set_eyelid_estimation(self, args: ValueChangeEventArguments) -> None:
         await SteamVR.set_eyelid_estimation_enabled(enabled=args.value)
-        ui.notify(f"{'Enabled' if args.value else 'Disabled'} eyelid estimation!")
+        notify(f"{'Enabled' if args.value else 'Disabled'} eyelid estimation!")
 
     @modifies_installation
     async def install_toolkit(self) -> None:
@@ -197,50 +200,46 @@ class Root:
 
         self.log.push(f"It is recommended to verify {PSVR2_APP} files through Steam.", classes="text-bold")
 
-    @ui.refreshable_method
+    @refreshable_method
     async def check_for_updates(self) -> None:
         with self.working():
             if self.setting_up:
                 return
 
-            try:
-                with ui.dialog().on("hide", lambda: dialog.clear()) as dialog, ui.card(), ui.grid(columns=3).classes("items-center"):
-                    release = await self.get_latest_release(PSVR2_TOOLKIT_OWNER, PSVR2_TOOLKIT_NAME)
-                    async with aiofiles_open(Drivers.installed_path, "rb") as fp:
-                        self.show_update(
-                            PSVR2_TOOLKIT_NAME,
-                            release,
-                            partial(self.install_toolkit.refresh, f"{PSVR2_TOOLKIT_NAME} update"),
-                            up_to_date=compare_digest("sha256:" + sha256(await fp.read()).hexdigest(), release.assets[0].digest or ""),
-                        )
-
-                    release = await self.get_latest_release(PSVR2_TOOLKIT_INSTALLER_OWNER, PSVR2_TOOLKIT_INSTALLER_NAME)
+            with dialog().on("hide", lambda: update_dialog.clear()) as update_dialog, card(), grid(columns=3).classes("items-center"):
+                release = await self.get_latest_release(PSVR2_TOOLKIT_OWNER, PSVR2_TOOLKIT_NAME)
+                async with aiofiles_open(Drivers.installed_path, "rb") as fp:
                     self.show_update(
-                        PSVR2_TOOLKIT_INSTALLER_NAME,
+                        PSVR2_TOOLKIT_NAME,
                         release,
-                        partial(webbrowser_open, release.html_url),
-                        up_to_date=__version__ == release.tag_name.lstrip("v"),
+                        partial(self.install_toolkit.refresh, f"{PSVR2_TOOLKIT_NAME} update"),
+                        up_to_date=compare_digest("sha256:" + sha256(await fp.read()).hexdigest(), release.assets[0].digest or ""),
                     )
 
-                dialog.open()
-            except Exception as exc:
-                ui.notify(f"An error occurred while checking for updates: {exc}", color="red")
-                raise
+                release = await self.get_latest_release(PSVR2_TOOLKIT_INSTALLER_OWNER, PSVR2_TOOLKIT_INSTALLER_NAME)
+                self.show_update(
+                    PSVR2_TOOLKIT_INSTALLER_NAME,
+                    release,
+                    partial(webbrowser_open, release.html_url),
+                    up_to_date=__version__ == release.tag_name.lstrip("v"),
+                )
+
+            update_dialog.open()
 
     async def get_latest_release(self, owner: str, repo: str) -> Release:
         response = await self.github.rest.repos.async_get_latest_release(owner, repo)
         return response.parsed_data
 
     def show_update(self, name: str, release: Release, on_click: Handler[ClickEventArguments], *, up_to_date: bool) -> None:
-        ui.label(name).classes("font-bold")
-        ui.label(release.tag_name).classes("text-secondary")
-        ui.button("Update", on_click=on_click).bind_enabled_from(self, backward=partial(and_, not up_to_date))
-        with ui.expansion("Changelog").classes("col-span-full"):
-            ui.markdown(release.body or "No changelog provided.")
+        label(name).classes("font-bold")
+        label(release.tag_name).classes("text-secondary")
+        button("Update", on_click=on_click).bind_enabled_from(self, backward=partial(and_, not up_to_date))
+        with expansion("Changelog").classes("col-span-full"):
+            markdown(release.body or "No changelog provided.")
 
 
 def main() -> None:
-    ui.run(  # pyright: ignore[reportUnknownMemberType]
+    run(
         Root().setup,
         title=PSVR2_TOOLKIT_INSTALLER_NAME,
         dark=None,
