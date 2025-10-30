@@ -83,7 +83,7 @@ class SteamVR:
         return bool(data.get(PSVR2_SETTINGS_KEY, {}).get(EYELID_ESIMATION_KEY, False))
 
     @classmethod
-    async def set_eyelid_estimation_enabled(cls, *, enabled: bool) -> None:
+    async def set_eyelid_estimation(cls, *, enabled: bool) -> None:
         data = await cls.load_settings()
 
         if enabled:
@@ -172,7 +172,7 @@ class Root:
 
     async def set_eyelid_estimation(self, args: ValueChangeEventArguments) -> None:
         try:
-            await SteamVR.set_eyelid_estimation_enabled(enabled=args.value)
+            await SteamVR.set_eyelid_estimation(enabled=args.value)
             notify(f"{'Enabled' if args.value else 'Disabled'} eyelid estimation!")
         except Exception as exc:
             self.log.push(f"Setting eyelid estimation failed!\n{exc}", classes="text-negative")
