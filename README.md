@@ -6,17 +6,15 @@
 An unofficial tool that can install and configure the PlayStation VR2 Toolkit.
 
 **Features:**
-✅: Current release
-📈: Next release
 
-- ✅ A user interface.
-- ✅ Installation button for [PlayStation VR2 Toolkit].
-- ✅ Uninstallation button for [PlayStation VR2 Toolkit].
-- 📈 Options to toggle experimental eyelid estimation.
-- 📈 Update checkers for:
-  - 📈 PlayStation VR2 Toolkit Installer.
-  - 📈 [PlayStation VR2 Toolkit].
+- A user interface.
+- Installation button for [PlayStation VR2 Toolkit].
+- Uninstallation button for [PlayStation VR2 Toolkit].
+- Options to toggle experimental eyelid estimation.
+- Update checkers for:
+  - PlayStation VR2 Toolkit Installer.
+  - [PlayStation VR2 Toolkit].
 
 **To-Do:**
 
-- Add spinners next to all the buttons.
+- Review and handle edge cases for installing and uninstalling.
