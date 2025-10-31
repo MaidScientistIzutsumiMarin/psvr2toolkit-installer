@@ -1,0 +1,47 @@
+INSTALLATION: Installed -> Original, Download
+UNINSTALLATION: Delete Original
+- Installed: Signed & Newer   Original: Present
+- Installed: Signed           Original: Absent
+
+INSTALLATION: Download
+UNINSTALLATION: Original -> Installed
+- Installed: Signed & Older   Original: Present
+- Installed: Unsigned         Original: Present
+- Installed: Absent           Original: Present
+
+INSTALLATION: Do Nothing, Error
+UNINSTALLATION: Do Nothing, Error
+- Installed: Unsigned            Original: Absent
+- Installed: Absent              Original: Absent
+
+---
+
+INSTALLATION: Installed -> Original
+- Installed: Signed & Newer     Original: Present
+- Installed: Signed             Original: Absent
+
+INSTALLATION: Download
+- Installed: Signed & Newer     Original: Present
+- Installed: Signed             Original: Absent
+- Installed: Signed & Older     Original: Present
+- Installed: Unsigned           Original: Present
+- Installed: Absent             Original: Present
+
+INSTALLATION: Do Nothing, Error
+- Installed: Unsigned           Original: Absent
+- Installed: Absent             Original: Absent
+
+---
+
+UNINSTALLATION: Delete Original
+- Installed: Signed & Newer     Original: Present
+- Installed: Signed             Original: Absent
+
+UNINSTALLATION: Original -> Installed
+- Installed: Signed & Older     Original: Present
+- Installed: Unsigned           Original: Present
+- Installed: Absent             Original: Present
+
+UNINSTALLATION: Do Nothing, Error
+- Installed: Unsigned           Original: Absent
+- Installed: Absent             Original: Absent
