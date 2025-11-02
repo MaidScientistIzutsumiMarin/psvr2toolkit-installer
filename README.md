@@ -14,7 +14,3 @@ An unofficial tool that can install and configure the PlayStation VR2 Toolkit.
 - Update checkers for:
   - PlayStation VR2 Toolkit Installer.
   - [PlayStation VR2 Toolkit].
-
-**To-Do:**
-
-- Review and handle edge cases for installing and uninstalling.
