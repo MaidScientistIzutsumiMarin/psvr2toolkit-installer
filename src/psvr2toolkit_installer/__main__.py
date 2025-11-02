@@ -2,24 +2,21 @@ from contextlib import contextmanager
 from functools import partial
 from hashlib import sha256
 from hmac import compare_digest
-from json import dumps, loads
 from operator import and_
-from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar, Literal
+from typing import TYPE_CHECKING, Literal
 from webbrowser import open as webbrowser_open
 
 from aiofiles import open as aiofiles_open
-from aiofiles.os import replace, stat, unlink
+from aiofiles.os import replace, unlink
 from aiofiles.ospath import exists
 from githubkit import GitHub, UnauthAuthStrategy
 from nicegui import app
 from nicegui.binding import bindable_dataclass
 from nicegui.events import ValueChangeEventArguments  # noqa: TC002
 from nicegui.ui import button, card, checkbox, dialog, expansion, grid, label, log, markdown, notification, notify, refreshable_method, row, run, space, spinner, splitter  # pyright: ignore[reportUnknownVariableType]
-from signify.authenticode import AuthenticodeFile, AuthenticodeVerificationResult
-from SteamPathFinder import get_game_path, get_steam_path
 
-from psvr2toolkit_installer.vars import EYELID_ESIMATION_KEY, PSVR2_APP, PSVR2_SETTINGS_KEY, PSVR2_TOOLKIT_INSTALLER_NAME, PSVR2_TOOLKIT_INSTALLER_OWNER, PSVR2_TOOLKIT_NAME, PSVR2_TOOLKIT_OWNER, __version__
+from psvr2toolkit_installer.helpers import Drivers, SteamVR
+from psvr2toolkit_installer.vars import PSVR2_APP, PSVR2_TOOLKIT_INSTALLER_NAME, PSVR2_TOOLKIT_INSTALLER_OWNER, PSVR2_TOOLKIT_NAME, PSVR2_TOOLKIT_OWNER, __version__
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Generator
@@ -27,53 +24,6 @@ if TYPE_CHECKING:
 
     from githubkit.rest import Release
     from nicegui.events import ClickEventArguments, Handler
-
-
-class Drivers:
-    installed_path: ClassVar = Path(get_game_path(get_steam_path(), "2580190", PSVR2_APP)) / "SteamVR_Plug-In" / "bin" / "win64" / "driver_playstation_vr2.dll"
-    original_path: ClassVar = installed_path.with_name("driver_playstation_vr2_orig.dll")
-
-    @staticmethod
-    async def get_mtime(path: Path) -> float:
-        stats = await stat(path)
-        return stats.st_mtime
-
-    @classmethod
-    async def is_installed_signed_and_newer(cls) -> bool:
-        # Signed is true if the installed driver exists, and the signature can be verified.
-        if signed := await exists(cls.installed_path):
-            async with aiofiles_open(cls.installed_path, "rb") as fp:
-                signed = AuthenticodeFile.from_stream(fp.raw).explain_verify()[0] is AuthenticodeVerificationResult.OK
-
-        # If the installed driver is signed, and it was modified more recently than the original driver, the installed driver is probably a newer version.
-        # Alternatively, if the installed driver is signed, and there is no original driver, the install is normal. In this case, we can just treat it as newer.
-        return signed and (not await exists(cls.original_path) or await cls.get_mtime(cls.installed_path) > await cls.get_mtime(cls.original_path))
-
-
-class SteamVR:
-    settings_path: ClassVar = Path(get_steam_path()) / "config" / "steamvr.vrsettings"
-
-    @classmethod
-    async def load_settings(cls) -> dict[str, dict[str, str | float | bool]]:
-        async with aiofiles_open(cls.settings_path, "rb") as fp:
-            return loads(await fp.read())
-
-    @classmethod
-    async def is_eyelid_estimation_enabled(cls) -> bool:
-        data = await cls.load_settings()
-        return bool(data.get(PSVR2_SETTINGS_KEY, {}).get(EYELID_ESIMATION_KEY, False))
-
-    @classmethod
-    async def set_eyelid_estimation(cls, *, enabled: bool) -> None:
-        data = await cls.load_settings()
-
-        if enabled:
-            data[PSVR2_SETTINGS_KEY] = {EYELID_ESIMATION_KEY: True}
-        else:
-            del data[PSVR2_SETTINGS_KEY]
-
-        async with aiofiles_open(cls.settings_path, "w", encoding="utf-8") as fp:
-            await fp.write(dumps(data, ensure_ascii=False, indent=3))
 
 
 @bindable_dataclass
