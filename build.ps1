@@ -1,11 +1,14 @@
 function Invoke-NiceGUIPack {
     param ([switch]$OneFile)
     Remove-Item build, dist -Recurse -ErrorAction SilentlyContinue
-    nicegui-pack.exe --name psvr2toolkit-installer --windowed ($OneFile ? '--onefile' : '--') src\psvr2toolkit_installer\__main__.py
+    nicegui-pack.exe --name $Name --windowed ($OneFile ? '--onefile' : '--') src\$Module\__main__.py
 }
 
+$Name = 'psvr2toolkit-installer'
+$Module = $Name -replace '-', '_'
+
 Invoke-NiceGUIPack
-7z.exe a psvr2toolkit-installer dist\psvr2toolkit-installer
+7z.exe a $Name dist\$Name
 Invoke-NiceGUIPack -OneFile
 Move-Item dist\* . -Force
 flit.exe publish
