@@ -3,13 +3,13 @@ from functools import partial
 from hashlib import sha256
 from hmac import compare_digest
 from operator import and_
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, ClassVar, Literal
 from webbrowser import open as webbrowser_open
 
 from aiofiles import open as aiofiles_open
 from aiofiles.os import replace, unlink
 from aiofiles.ospath import exists
-from githubkit import GitHub, UnauthAuthStrategy
+from githubkit import GitHub
 from nicegui import app
 from nicegui.binding import bindable_dataclass
 from nicegui.events import ValueChangeEventArguments  # noqa: TC002
@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
 @bindable_dataclass
 class Root:
-    github: GitHub[UnauthAuthStrategy]
+    github: ClassVar = GitHub()
     enabled = True
     setting_up = True
 
@@ -185,15 +185,12 @@ class Root:
 
 
 def main() -> None:
+    app.on_shutdown(Root.github.__aexit__)  # pyright: ignore[reportUnknownMemberType]
+
     run(
-        start,
+        Root().setup,
         title=PSVR2_TOOLKIT_INSTALLER_NAME,
         dark=None,
         window_size=(650, 500),
         reload=False,
     )
-
-
-async def start() -> None:
-    async with GitHub() as github:
-        await Root(github).setup()
