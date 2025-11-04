@@ -28,6 +28,11 @@ An unofficial tool that can install and configure the PlayStation VR2 Toolkit.
 
 ### Downloadable Binary
 
+| Pros | Cons |
+| --- | --- |
+| Easier to install | Harder to update |
+| No risk of dependencies breaking | Dependencies may be older |
+
 #### .exe Version
 
 | Pros | Cons |
