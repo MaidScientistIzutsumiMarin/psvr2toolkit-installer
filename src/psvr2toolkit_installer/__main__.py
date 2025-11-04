@@ -12,6 +12,7 @@ from aiofiles.os import replace, unlink
 from aiofiles.ospath import exists
 from githubkit import GitHub
 from nicegui import app
+from nicegui.binding import bindable_dataclass
 from nicegui.events import ValueChangeEventArguments  # noqa: TC002
 from nicegui.ui import button, card, checkbox, dialog, expansion, grid, label, log, markdown, notification, notify, refreshable_method, row, run, space, spinner, splitter  # pyright: ignore[reportUnknownVariableType]
 
@@ -26,14 +27,14 @@ if TYPE_CHECKING:
     from nicegui.events import ClickEventArguments, Handler
 
 
+@bindable_dataclass
 class Root:
     github: ClassVar = GitHub()
     setting_up = True
     lock = Lock()
 
-    @property
-    def enabled(self) -> bool:
-        return not self.lock.locked()
+    enabled = True
+    text = ""
 
     @staticmethod
     def modifies_toolkit(function: Callable[[Root], Awaitable[object]]) -> refreshable_method[Root, [str], CoroutineType[object, object, None]]:
@@ -67,6 +68,7 @@ class Root:
     @asynccontextmanager
     async def working(self) -> AsyncGenerator[None]:
         async with self.lock:
+            self.enabled = False
             work_spinner = spinner(size="1.5em")
 
             try:
@@ -76,6 +78,8 @@ class Root:
                 raise
             finally:
                 work_spinner.set_visibility(False)
+                self.text = "Not installed" if await Drivers.is_installed_signed_and_newer() else "Installed"
+                self.enabled = True
 
     async def setup(self) -> None:
         with splitter().classes("w-full") as root_splitter:
@@ -89,6 +93,11 @@ class Root:
                     value=await SteamVR.is_eyelid_estimation_enabled(),
                     on_change=self.set_eyelid_estimation,
                 ).bind_enabled_from(self)
+
+                with row():
+                    space()
+                    label(f"{PSVR2_TOOLKIT_NAME}:").classes("text-grey")
+                    label().classes("text-secondary").bind_text_from(self)
 
         self.log = log()
 
