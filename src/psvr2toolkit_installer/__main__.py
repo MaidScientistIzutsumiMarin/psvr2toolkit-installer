@@ -189,7 +189,7 @@ class Root:
 def main() -> None:
     run(
         Root().setup,
-        title=PSVR2_TOOLKIT_INSTALLER_NAME,
+        title=f"{PSVR2_TOOLKIT_INSTALLER_NAME} v{__version__}",
         dark=None,
         window_size=(650, 500),
         reload=False,
