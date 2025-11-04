@@ -21,10 +21,6 @@ An unofficial tool that can install and configure the PlayStation VR2 Toolkit.
 - Update checkers for:
   - PlayStation VR2 Toolkit Installer.
   - [PlayStation VR2 Toolkit].
-
-**To-Do:**
-
-- Add install and usage to this README.
   
 **Please submit an issue or contact us for features you want added/reimplemented.**
 
