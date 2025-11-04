@@ -1,4 +1,5 @@
-from contextlib import contextmanager
+from asyncio import Lock
+from contextlib import asynccontextmanager
 from functools import partial
 from hashlib import sha256
 from hmac import compare_digest
@@ -11,7 +12,6 @@ from aiofiles.os import replace, unlink
 from aiofiles.ospath import exists
 from githubkit import GitHub
 from nicegui import app
-from nicegui.binding import bindable_dataclass
 from nicegui.events import ValueChangeEventArguments  # noqa: TC002
 from nicegui.ui import button, card, checkbox, dialog, expansion, grid, label, log, markdown, notification, notify, refreshable_method, row, run, space, spinner, splitter  # pyright: ignore[reportUnknownVariableType]
 
@@ -19,24 +19,27 @@ from psvr2toolkit_installer.helpers import Drivers, SteamVR
 from psvr2toolkit_installer.vars import PSVR2_APP, PSVR2_TOOLKIT_INSTALLER_NAME, PSVR2_TOOLKIT_INSTALLER_OWNER, PSVR2_TOOLKIT_NAME, PSVR2_TOOLKIT_OWNER, __version__
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable, Generator
+    from collections.abc import AsyncGenerator, Awaitable, Callable
     from types import CoroutineType
 
     from githubkit.rest import Release
     from nicegui.events import ClickEventArguments, Handler
 
 
-@bindable_dataclass
 class Root:
     github: ClassVar = GitHub()
-    enabled = True
     setting_up = True
+    lock = Lock()
+
+    @property
+    def enabled(self) -> bool:
+        return not self.lock.locked()
 
     @staticmethod
     def modifies_toolkit(function: Callable[[Root], Awaitable[object]]) -> refreshable_method[Root, [str], CoroutineType[object, object, None]]:
         @refreshable_method
         async def wrapper(self: Root, verb: str) -> None:
-            with self.working():
+            async with self.working():
                 if self.setting_up:
                     return
 
@@ -61,19 +64,18 @@ class Root:
 
         return wrapper
 
-    @contextmanager
-    def working(self) -> Generator[None]:
-        self.enabled = False
-        work_spinner = spinner(size="1.5em")
+    @asynccontextmanager
+    async def working(self) -> AsyncGenerator[None]:
+        async with self.lock:
+            work_spinner = spinner(size="1.5em")
 
-        try:
-            yield
-        except Exception as exc:
-            self.log.push(f"Operation failed!\n{exc}", classes="text-negative")
-            raise
-        finally:
-            work_spinner.set_visibility(False)
-            self.enabled = True
+            try:
+                yield
+            except Exception as exc:
+                self.log.push(f"Operation failed!\n{exc}", classes="text-negative")
+                raise
+            finally:
+                work_spinner.set_visibility(False)
 
     async def setup(self) -> None:
         with splitter().classes("w-full") as root_splitter:
@@ -116,12 +118,12 @@ class Root:
         release = await self.get_latest_release(PSVR2_TOOLKIT_OWNER, PSVR2_TOOLKIT_NAME)
 
         self.log.push("Downloading latest release...")
-        async with self.github.get_async_client() as client:
-            response = await client.get(release.assets[0].browser_download_url)
+
+        response = await self.github.arequest("GET", release.assets[0].browser_download_url)  # pyright: ignore[reportUnknownMemberType]
 
         self.log.push("Saving latest release as installed driver...")
         async with aiofiles_open(Drivers.installed_path, "wb") as fp:
-            await fp.write(await response.aread())
+            await fp.write(response.content)
 
     @modifies_toolkit
     async def uninstall_toolkit(self) -> None:
@@ -148,7 +150,7 @@ class Root:
 
     @refreshable_method
     async def check_for_updates(self) -> None:
-        with self.working():
+        async with self.working():
             if self.setting_up:
                 return
 
@@ -185,8 +187,6 @@ class Root:
 
 
 def main() -> None:
-    app.on_shutdown(Root.github.__aexit__)  # pyright: ignore[reportUnknownMemberType]
-
     run(
         Root().setup,
         title=PSVR2_TOOLKIT_INSTALLER_NAME,
