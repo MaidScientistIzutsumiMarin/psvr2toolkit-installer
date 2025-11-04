@@ -1,5 +1,12 @@
 # psvr2toolkit-installer
 
+[psvr2toolkit-installer.exe]: https://github.com/MaidScientistIzutsumiMarin/psvr2toolkit-installer/releases/latest/download/psvr2toolkit-installer.exe
+[psvr2toolkit-installer.7z]:  https://github.com/MaidScientistIzutsumiMarin/psvr2toolkit-installer/releases/latest/download/psvr2toolkit-installer.7z
+
+[Python]: https://python.org/download
+
+[pip]: https://pypi.org
+
 [PlayStation VR2 Toolkit]: https://github.com/BnuuySolutions/PSVR2Toolkit
 [![PyPI - Version](https://img.shields.io/pypi/v/psvr2toolkit-installer)](https://python.org/pypi/psvr2toolkit-installer)
 
@@ -18,3 +25,45 @@ An unofficial tool that can install and configure the PlayStation VR2 Toolkit.
 **To-Do:**
 
 - Add install and usage to this README.
+  
+**Please submit an issue or contact us for features you want added/reimplemented.**
+
+## Installation & Usage
+
+### Downloadable Binary
+
+#### .exe Version
+
+| Pros | Cons |
+| --- | --- |
+| Smaller install size | Larger download size |
+| Single file | Slower launch |
+
+1. Download the latest release's [psvr2toolkit-installer.exe].
+1. Launch `psvr2toolkit-installer.exe` in the install location.
+
+#### .7z Version
+
+| Pros | Cons |
+| --- | --- |
+| Smaller download size | Larger install size |
+| Faster launch | Multiple files |
+
+1. Download the latest release's [psvr2toolkit-installer.7z].
+1. Launch `psvr2toolkit-installer.exe` in the install location.
+
+### PyPi
+
+| Pros | Cons |
+| --- | --- |
+| Easier to update | Harder to install |
+| Dependencies may be newer | Dependencies may break |
+
+1. Install the latest version of [Python]:
+   - Windows: `winget install python3`
+   - Linux (apt): `apt install python-pip`
+   - Linux (pacman): `pacman install python-pip`
+1. Install the [pip] package: `pip install psvr2toolkit-installer`
+   - Alternatively, you can install from this repository: `pip install git+https://github.com/MaidScientistIzutsumiMarin/psvr2toolkit-installer.git`
+   - On Linux, you will have to make a virtual environment or use the flag to install packages system-wide.
+1. Run `psvr2toolkit-installer` from anywhere.
