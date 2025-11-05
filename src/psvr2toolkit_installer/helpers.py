@@ -1,3 +1,4 @@
+from asyncio import Lock
 from json import dumps, loads
 from pathlib import Path
 from typing import ClassVar
@@ -5,6 +6,7 @@ from typing import ClassVar
 from aiofiles import open as aiofiles_open
 from aiofiles.os import stat
 from aiofiles.ospath import exists
+from nicegui.binding import BindableProperty
 from signify.authenticode import AuthenticodeFile, AuthenticodeVerificationResult
 from SteamPathFinder import get_game_path, get_steam_path
 
@@ -56,3 +58,7 @@ class SteamVR:
 
         async with aiofiles_open(cls.settings_path, "w", encoding="utf-8") as fp:
             await fp.write(dumps(data, ensure_ascii=False, indent=3))
+
+
+class BindableLock(Lock):
+    _locked = BindableProperty()

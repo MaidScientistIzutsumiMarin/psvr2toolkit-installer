@@ -1,9 +1,8 @@
-from asyncio import Lock
 from contextlib import asynccontextmanager
 from functools import partial
 from hashlib import sha256
 from hmac import compare_digest
-from operator import and_
+from operator import not_
 from typing import TYPE_CHECKING, ClassVar, Literal
 from webbrowser import open as webbrowser_open
 
@@ -12,11 +11,12 @@ from aiofiles.os import replace, unlink
 from aiofiles.ospath import exists
 from githubkit import GitHub
 from nicegui import app
-from nicegui.binding import bindable_dataclass
+from nicegui.binding import active_links, bindable_dataclass
 from nicegui.events import ValueChangeEventArguments  # noqa: TC002
 from nicegui.ui import button, card, checkbox, dialog, expansion, grid, label, log, markdown, notification, notify, refreshable_method, row, run, space, spinner, splitter  # pyright: ignore[reportUnknownVariableType]
+from rich.pretty import pprint
 
-from psvr2toolkit_installer.helpers import Drivers, SteamVR
+from psvr2toolkit_installer.helpers import BindableLock, Drivers, SteamVR
 from psvr2toolkit_installer.vars import PSVR2_APP, PSVR2_TOOLKIT_INSTALLER_NAME, PSVR2_TOOLKIT_INSTALLER_OWNER, PSVR2_TOOLKIT_NAME, PSVR2_TOOLKIT_OWNER, __version__
 
 if TYPE_CHECKING:
@@ -30,11 +30,10 @@ if TYPE_CHECKING:
 @bindable_dataclass
 class Root:
     github: ClassVar = GitHub()
-    setting_up = True
-    lock = Lock()
+    lock: ClassVar = BindableLock()
 
-    enabled = True
-    text = ""
+    text: str = ""
+    setting_up = True
 
     @staticmethod
     def modifies_toolkit(function: Callable[[Root], Awaitable[object]]) -> refreshable_method[Root, [str], CoroutineType[object, object, None]]:
@@ -65,10 +64,26 @@ class Root:
 
         return wrapper
 
+    @classmethod
+    def bound_button(cls, text: str, on_click: Handler[ClickEventArguments], backward: Callable[[bool], bool] = not_) -> button:
+        return button(text, on_click=on_click).bind_enabled_from(cls.lock, "_locked", backward=backward)
+
+    @classmethod
+    async def get_latest_release(cls, owner: str, repo: str) -> Release:
+        response = await cls.github.rest.repos.async_get_latest_release(owner, repo)
+        return response.parsed_data
+
+    @classmethod
+    def show_update(cls, name: str, release: Release, on_click: Handler[ClickEventArguments], *, up_to_date: bool) -> None:
+        label(name).classes("font-bold")
+        label(release.tag_name).classes("text-secondary")
+        cls.bound_button("Update", on_click, lambda locked: not (locked or up_to_date))
+        with expansion("Changelog").classes("col-span-full"):
+            markdown(release.body or "No changelog provided.")
+
     @asynccontextmanager
     async def working(self) -> AsyncGenerator[None]:
         async with self.lock:
-            self.enabled = False
             work_spinner = spinner(size="1.5em")
 
             try:
@@ -79,7 +94,6 @@ class Root:
             finally:
                 work_spinner.set_visibility(False)
                 self.text = "Not installed" if await Drivers.is_installed_signed_and_newer() else "Installed"
-                self.enabled = True
 
     async def setup(self) -> None:
         with splitter().classes("w-full") as root_splitter:
@@ -92,21 +106,23 @@ class Root:
                     "Enable Experimental Eyelid Estimation",
                     value=await SteamVR.is_eyelid_estimation_enabled(),
                     on_change=self.set_eyelid_estimation,
-                ).bind_enabled_from(self)
+                )
 
                 with row():
                     space()
                     label(f"{PSVR2_TOOLKIT_NAME}:").classes("text-grey")
                     label().classes("text-secondary").bind_text_from(self)
 
+                button("Active Links", on_click=partial(pprint, active_links))
+
         self.log = log()
 
         with row(align_items="center").classes("w-full"):
-            button("Check for Updates", on_click=self.check_for_updates.refresh).bind_enabled_from(self)
+            self.bound_button("Check for Updates", self.check_for_updates.refresh)
             await self.check_for_updates()
 
             space()
-            button("Quit", on_click=app.shutdown).bind_enabled_from(self)
+            self.bound_button("Quit", app.shutdown)
 
         self.setting_up = False
 
@@ -114,7 +130,7 @@ class Root:
         function = self.install_toolkit if verb == "Install" else self.uninstall_toolkit
 
         with row(align_items="center"):
-            button(f"{verb} {PSVR2_TOOLKIT_NAME}", on_click=function.refresh).bind_enabled_from(self)
+            self.bound_button(f"{verb} {PSVR2_TOOLKIT_NAME}", function.refresh)
             await function(f"{verb}ing {PSVR2_TOOLKIT_NAME}")
 
     @modifies_toolkit
@@ -182,17 +198,6 @@ class Root:
                 )
 
             update_dialog.open()
-
-    async def get_latest_release(self, owner: str, repo: str) -> Release:
-        response = await self.github.rest.repos.async_get_latest_release(owner, repo)
-        return response.parsed_data
-
-    def show_update(self, name: str, release: Release, on_click: Handler[ClickEventArguments], *, up_to_date: bool) -> None:
-        label(name).classes("font-bold")
-        label(release.tag_name).classes("text-secondary")
-        button("Update", on_click=on_click).bind_enabled_from(self, backward=partial(and_, not up_to_date))
-        with expansion("Changelog").classes("col-span-full"):
-            markdown(release.body or "No changelog provided.")
 
 
 def main() -> None:
