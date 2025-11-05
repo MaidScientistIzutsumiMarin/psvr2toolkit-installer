@@ -65,7 +65,7 @@ class Root:
 
     @classmethod
     def locked_button(cls, text: str, on_click: Handler[ClickEventArguments], backward: Callable[[bool], bool] = not_) -> button:
-        return button(text, on_click=on_click).bind_enabled_from(cls.lock, "_locked", backward=backward)
+        return button(text, on_click=on_click).bind_enabled_from(cls.lock, "_locked", backward)
 
     @classmethod
     def show_update(cls, name: str, release: Release, on_click: Handler[ClickEventArguments], *, up_to_date: bool) -> None:
