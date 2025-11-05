@@ -122,8 +122,8 @@ class Root:
         function = self.install_toolkit if verb == "Install" else self.uninstall_toolkit
 
         with row(align_items="center"):
-            self.locked_button(f"{verb} {PSVR2_TOOLKIT_NAME}", function.refresh)
-            await function(f"{verb}ing {PSVR2_TOOLKIT_NAME}")
+            self.locked_button(f"{verb} {PSVR2_TOOLKIT_NAME}", partial(function.refresh, f"{verb}ing {PSVR2_TOOLKIT_NAME}"))
+            await function("")
 
     @modifies_toolkit
     async def install_toolkit(self) -> None:
