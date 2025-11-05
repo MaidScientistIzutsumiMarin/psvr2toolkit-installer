@@ -11,10 +11,9 @@ from aiofiles.os import replace, unlink
 from aiofiles.ospath import exists
 from githubkit import GitHub
 from nicegui import app
-from nicegui.binding import active_links, bindable_dataclass
+from nicegui.binding import bindable_dataclass
 from nicegui.events import ValueChangeEventArguments  # noqa: TC002
 from nicegui.ui import button, card, checkbox, dialog, expansion, grid, label, log, markdown, notification, notify, refreshable_method, row, run, space, spinner, splitter  # pyright: ignore[reportUnknownVariableType]
-from rich.pretty import pprint
 
 from psvr2toolkit_installer.helpers import BindableLock, Drivers, SteamVR
 from psvr2toolkit_installer.vars import PSVR2_APP, PSVR2_TOOLKIT_INSTALLER_NAME, PSVR2_TOOLKIT_INSTALLER_OWNER, PSVR2_TOOLKIT_NAME, PSVR2_TOOLKIT_OWNER, __version__
@@ -65,7 +64,7 @@ class Root:
         return wrapper
 
     @classmethod
-    def bound_button(cls, text: str, on_click: Handler[ClickEventArguments], backward: Callable[[bool], bool] = not_) -> button:
+    def locked_button(cls, text: str, on_click: Handler[ClickEventArguments], backward: Callable[[bool], bool] = not_) -> button:
         return button(text, on_click=on_click).bind_enabled_from(cls.lock, "_locked", backward=backward)
 
     @classmethod
@@ -77,7 +76,7 @@ class Root:
     def show_update(cls, name: str, release: Release, on_click: Handler[ClickEventArguments], *, up_to_date: bool) -> None:
         label(name).classes("font-bold")
         label(release.tag_name).classes("text-secondary")
-        cls.bound_button("Update", on_click, lambda locked: not (locked or up_to_date))
+        cls.locked_button("Update", on_click, lambda locked: not (locked or up_to_date))
         with expansion("Changelog").classes("col-span-full"):
             markdown(release.body or "No changelog provided.")
 
@@ -113,16 +112,14 @@ class Root:
                     label(f"{PSVR2_TOOLKIT_NAME}:").classes("text-grey")
                     label().classes("text-secondary").bind_text_from(self)
 
-                button("Active Links", on_click=partial(pprint, active_links))
-
         self.log = log()
 
         with row(align_items="center").classes("w-full"):
-            self.bound_button("Check for Updates", self.check_for_updates.refresh)
+            self.locked_button("Check for Updates", self.check_for_updates.refresh)
             await self.check_for_updates()
 
             space()
-            self.bound_button("Quit", app.shutdown)
+            self.locked_button("Quit", app.shutdown)
 
         self.setting_up = False
 
@@ -130,7 +127,7 @@ class Root:
         function = self.install_toolkit if verb == "Install" else self.uninstall_toolkit
 
         with row(align_items="center"):
-            self.bound_button(f"{verb} {PSVR2_TOOLKIT_NAME}", function.refresh)
+            self.locked_button(f"{verb} {PSVR2_TOOLKIT_NAME}", function.refresh)
             await function(f"{verb}ing {PSVR2_TOOLKIT_NAME}")
 
     @modifies_toolkit
