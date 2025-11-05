@@ -9,12 +9,12 @@ from webbrowser import open as webbrowser_open
 from aiofiles import open as aiofiles_open
 from aiofiles.os import replace, unlink
 from aiofiles.ospath import exists
-from githubkit import GitHub
 from nicegui import app
 from nicegui.binding import bindable_dataclass
 from nicegui.events import ValueChangeEventArguments  # noqa: TC002
 from nicegui.ui import button, card, checkbox, dialog, expansion, grid, label, log, markdown, notification, notify, refreshable_method, row, run, space, spinner, splitter  # pyright: ignore[reportUnknownVariableType]
 
+from psvr2toolkit_installer.github import CustomGitHub
 from psvr2toolkit_installer.helpers import BindableLock, Drivers, SteamVR
 from psvr2toolkit_installer.vars import PSVR2_APP, PSVR2_TOOLKIT_INSTALLER_NAME, PSVR2_TOOLKIT_INSTALLER_OWNER, PSVR2_TOOLKIT_NAME, PSVR2_TOOLKIT_OWNER, __version__
 
@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
 @bindable_dataclass
 class Root:
-    github: ClassVar = GitHub()
+    github: ClassVar = CustomGitHub()
     lock: ClassVar = BindableLock()
 
     text: str = ""
@@ -66,11 +66,6 @@ class Root:
     @classmethod
     def locked_button(cls, text: str, on_click: Handler[ClickEventArguments], backward: Callable[[bool], bool] = not_) -> button:
         return button(text, on_click=on_click).bind_enabled_from(cls.lock, "_locked", backward=backward)
-
-    @classmethod
-    async def get_latest_release(cls, owner: str, repo: str) -> Release:
-        response = await cls.github.rest.repos.async_get_latest_release(owner, repo)
-        return response.parsed_data
 
     @classmethod
     def show_update(cls, name: str, release: Release, on_click: Handler[ClickEventArguments], *, up_to_date: bool) -> None:
@@ -136,12 +131,8 @@ class Root:
             self.log.push("Copying installed driver...")
             await replace(Drivers.installed_path, Drivers.original_path)
 
-        self.log.push("Finding latest release...")
-        release = await self.get_latest_release(PSVR2_TOOLKIT_OWNER, PSVR2_TOOLKIT_NAME)
-
         self.log.push("Downloading latest release...")
-
-        response = await self.github.arequest("GET", release.assets[0].browser_download_url)  # pyright: ignore[reportUnknownMemberType]
+        response = await self.github.download_latest_release(PSVR2_TOOLKIT_OWNER, PSVR2_TOOLKIT_NAME)
 
         self.log.push("Saving latest release as installed driver...")
         async with aiofiles_open(Drivers.installed_path, "wb") as fp:
@@ -177,7 +168,7 @@ class Root:
                 return
 
             with dialog().on("hide", lambda: update_dialog.clear()) as update_dialog, card(), grid(columns=3).classes("items-center"):
-                release = await self.get_latest_release(PSVR2_TOOLKIT_OWNER, PSVR2_TOOLKIT_NAME)
+                release = await self.github.get_latest_release(PSVR2_TOOLKIT_OWNER, PSVR2_TOOLKIT_NAME)
                 async with aiofiles_open(Drivers.installed_path, "rb") as fp:
                     self.show_update(
                         PSVR2_TOOLKIT_NAME,
@@ -186,7 +177,7 @@ class Root:
                         up_to_date=compare_digest("sha256:" + sha256(await fp.read()).hexdigest(), release.assets[0].digest or ""),
                     )
 
-                release = await self.get_latest_release(PSVR2_TOOLKIT_INSTALLER_OWNER, PSVR2_TOOLKIT_INSTALLER_NAME)
+                release = await self.github.get_latest_release(PSVR2_TOOLKIT_INSTALLER_OWNER, PSVR2_TOOLKIT_INSTALLER_NAME)
                 self.show_update(
                     PSVR2_TOOLKIT_INSTALLER_NAME,
                     release,
