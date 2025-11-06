@@ -9,7 +9,6 @@ from webbrowser import open as webbrowser_open
 from aiofiles import open as aiofiles_open
 from aiofiles.os import replace, unlink
 from aiofiles.ospath import exists
-from nicegui import app
 from nicegui.binding import bindable_dataclass
 from nicegui.events import ValueChangeEventArguments  # noqa: TC002
 from nicegui.ui import button, card, checkbox, dialog, expansion, grid, label, log, markdown, notification, notify, refreshable_method, row, run, space, spinner, splitter  # pyright: ignore[reportUnknownVariableType]
@@ -44,11 +43,11 @@ class Root:
 
                 work_notification = notification(f"{verb}...", spinner=True, timeout=None)
 
-                try:
-                    self.log.clear()
-                    self.log.push(f"{verb} starting...")
+                self.log.clear()
+                self.log.push(f"{verb} starting...")
+                self.log.push("Verifying relevant files...")
 
-                    self.log.push("Verifying relevant files...")
+                try:
                     if not await exists(Drivers.original_path) and not await Drivers.is_installed_signed_and_newer():
                         msg = f"{PSVR2_APP} has invalid files. Please verify its integrity."
                         raise RuntimeError(msg)
@@ -113,9 +112,6 @@ class Root:
             self.locked_button("Check for Updates", self.check_for_updates.refresh)
             await self.check_for_updates()
 
-            space()
-            self.locked_button("Quit", app.shutdown)
-
         self.setting_up = False
 
     async def create_modification_button(self, verb: Literal["Install", "Uninstall"]) -> None:
@@ -156,10 +152,11 @@ class Root:
     async def set_eyelid_estimation(self, args: ValueChangeEventArguments) -> None:
         try:
             await SteamVR.set_eyelid_estimation(enabled=args.value)
-            notify(f"{'Enabled' if args.value else 'Disabled'} eyelid estimation!")
         except Exception as exc:
             self.log.push(f"Setting eyelid estimation failed!\n{exc}", classes="text-negative")
             raise
+        else:
+            notify(f"{'Enabled' if args.value else 'Disabled'} eyelid estimation!")
 
     @refreshable_method
     async def check_for_updates(self) -> None:
