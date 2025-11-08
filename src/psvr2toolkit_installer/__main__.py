@@ -4,6 +4,7 @@ from functools import partial
 from hashlib import sha256
 from hmac import compare_digest
 from operator import not_
+from sys import exit as sys_exit
 from typing import TYPE_CHECKING, ClassVar, Literal
 from webbrowser import open as webbrowser_open
 
@@ -194,3 +195,7 @@ def main() -> None:
         window_size=(650, 500),
         reload=False,
     )
+
+
+if __name__ == "__main__":
+    sys_exit(main())
