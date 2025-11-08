@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from dataclasses import field
 from functools import partial
 from hashlib import sha256
 from hmac import compare_digest
@@ -30,7 +31,7 @@ class Root:
     github: ClassVar = CustomGitHub()
     lock: ClassVar = BindableLock()
 
-    text: str = ""
+    installed: bool = field(init=False)
     setting_up = True
 
     @staticmethod
@@ -48,7 +49,7 @@ class Root:
                 self.log.push("Verifying relevant files...")
 
                 try:
-                    if not await exists(Drivers.original_path) and not await Drivers.is_installed_signed_and_newer():
+                    if self.installed and not await exists(Drivers.original_path):
                         msg = f"{PSVR2_APP} has invalid files. Please verify its integrity."
                         raise RuntimeError(msg)
 
@@ -86,7 +87,7 @@ class Root:
                 raise
             finally:
                 work_spinner.set_visibility(False)
-                self.text = "Not installed" if await Drivers.is_installed_signed_and_newer() else "Installed"
+                self.installed = not await Drivers.is_installed_signed_and_newer()
 
     async def setup(self) -> None:
         with splitter().classes("w-full") as root_splitter:
@@ -104,7 +105,7 @@ class Root:
                 with row():
                     space()
                     label(f"{PSVR2_TOOLKIT_NAME}:").classes("text-grey")
-                    label().classes("text-secondary").bind_text_from(self)
+                    label().classes("text-secondary").bind_text_from(self, "installed", backward=lambda installed: "Installed" if installed else "Uninstalled")
 
         self.log = log()
 
@@ -123,7 +124,7 @@ class Root:
 
     @modifies_toolkit
     async def install_toolkit(self) -> None:
-        if await Drivers.is_installed_signed_and_newer():
+        if not self.installed:
             self.log.push("Copying installed driver...")
             await replace(Drivers.installed_path, Drivers.original_path)
 
@@ -140,12 +141,12 @@ class Root:
             msg = f"{PSVR2_TOOLKIT_NAME} is not installed."
             raise RuntimeError(msg)
 
-        if await Drivers.is_installed_signed_and_newer():
-            self.log.push("Installed driver is newer. Deleting original driver...")
-            await unlink(Drivers.original_path)
-        else:
+        if self.installed:
             self.log.push("Replacing installed driver with original driver...")
             await replace(Drivers.original_path, Drivers.installed_path)
+        else:
+            self.log.push("Installed driver is newer. Deleting original driver...")
+            await unlink(Drivers.original_path)
 
         self.log.push(f"Please verify the integrity of {PSVR2_APP}'s files through Steam.", classes="text-bold")
 
