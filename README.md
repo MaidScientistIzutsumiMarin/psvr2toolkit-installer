@@ -1,7 +1,6 @@
 # psvr2toolkit-installer
 
 [psvr2toolkit-installer.exe]: https://github.com/MaidScientistIzutsumiMarin/psvr2toolkit-installer/releases/latest/download/psvr2toolkit-installer.exe
-[psvr2toolkit-installer.7z]:  https://github.com/MaidScientistIzutsumiMarin/psvr2toolkit-installer/releases/latest/download/psvr2toolkit-installer.7z
 
 [Python]: https://python.org/download
 
@@ -33,24 +32,7 @@ An unofficial tool that can install and configure the PlayStation VR2 Toolkit.
 | Easier to install | Harder to update |
 | No risk of dependencies breaking | Dependencies may be older |
 
-#### .exe Version
-
-| Pros | Cons |
-| --- | --- |
-| Smaller install size | Larger download size |
-| Single file | Slower launch |
-
 1. Download the latest release's [psvr2toolkit-installer.exe].
-1. Launch `psvr2toolkit-installer.exe` in the install location.
-
-#### .7z Version
-
-| Pros | Cons |
-| --- | --- |
-| Smaller download size | Larger install size |
-| Faster launch | Multiple files |
-
-1. Download the latest release's [psvr2toolkit-installer.7z].
 1. Launch `psvr2toolkit-installer.exe` in the install location.
 
 ### PyPi
