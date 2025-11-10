@@ -1,1 +1,1 @@
-from psvr2toolkit_installer.vars import __version__ as __version__
+__version__ = "1.1.1"

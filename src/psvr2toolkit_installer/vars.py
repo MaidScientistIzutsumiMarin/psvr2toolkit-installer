@@ -1,5 +1,3 @@
-__version__ = "1.1.1"
-
 PSVR2_APP = "PlayStation VR2 App"
 STEAMVR = "SteamVR"
 

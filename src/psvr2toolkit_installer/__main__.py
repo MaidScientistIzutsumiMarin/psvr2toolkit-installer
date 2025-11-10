@@ -15,9 +15,10 @@ from nicegui.binding import bindable_dataclass
 from nicegui.events import ValueChangeEventArguments  # noqa: TC002
 from nicegui.ui import button, card, checkbox, dialog, expansion, grid, label, log, markdown, notification, notify, refreshable_method, row, run, space, spinner, splitter  # pyright: ignore[reportUnknownVariableType]
 
+from psvr2toolkit_installer import __version__
 from psvr2toolkit_installer.github import CustomGitHub
 from psvr2toolkit_installer.helpers import BindableLock, Drivers, SteamVR
-from psvr2toolkit_installer.vars import PSVR2_APP, PSVR2_TOOLKIT_INSTALLER_NAME, PSVR2_TOOLKIT_INSTALLER_OWNER, PSVR2_TOOLKIT_NAME, PSVR2_TOOLKIT_OWNER, __version__
+from psvr2toolkit_installer.vars import PSVR2_APP, PSVR2_TOOLKIT_INSTALLER_NAME, PSVR2_TOOLKIT_INSTALLER_OWNER, PSVR2_TOOLKIT_NAME, PSVR2_TOOLKIT_OWNER
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Awaitable, Callable
