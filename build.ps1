@@ -1,1 +1,1 @@
-..\..\Powershell\build.ps1 'githubkit/rest/__init__.py', 'githubkit/versions/v2022_11_28/models/__init__.py' -ExtraArgs '--windowed --collect-data mscerts --collect-all nicegui --optimize 1'
+..\..\Powershell\build.ps1 'githubkit/rest/__init__.py', 'githubkit/versions/v2022_11_28/models/__init__.py' -ExtraArgs '--windowed --collect-data mscerts --collect-all nicegui --optimize 1' -Install 'git+https://github.com/pythonnet/pythonnet@python3.14'
