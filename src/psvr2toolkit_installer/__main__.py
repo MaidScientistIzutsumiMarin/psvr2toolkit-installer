@@ -34,16 +34,16 @@ class Root:
     lock: ClassVar = BindableLock()
 
     installed: bool = field(init=False)
-    setting_up = True
+    instantiated = False
 
     @staticmethod
     def modifies_toolkit(function: Callable[[Root], Awaitable[object]]) -> refreshable_method[Root, [str], CoroutineType[object, object, None]]:
         @refreshable_method
         async def wrapper(self: Root, verb: str) -> None:
-            async with self.working():
-                if self.setting_up:
-                    return
+            if not self.instantiated:
+                return
 
+            async with self.working():
                 work_notification = notification(f"{verb}...", spinner=True, timeout=None)
 
                 self.log.clear()
@@ -62,6 +62,8 @@ class Root:
                     work_notification.message = f"{verb} done!"
                     work_notification.spinner = False
                     work_notification.timeout = 5
+
+                    await self.check_installed()
 
         return wrapper
 
@@ -89,9 +91,10 @@ class Root:
                 raise
             finally:
                 work_spinner.set_visibility(False)
-                self.installed = not await Drivers.is_installed_signed_and_newer()
 
     async def setup(self) -> None:
+        await self.check_installed()
+
         with splitter().classes("w-full") as root_splitter:
             with root_splitter.before:
                 await self.create_modification_button("Install")
@@ -115,7 +118,7 @@ class Root:
             self.locked_button("Check for Updates", self.check_for_updates.refresh)
             await self.check_for_updates()
 
-        self.setting_up = False
+        self.instantiated = True
 
     async def create_modification_button(self, verb: Literal["Install", "Uninstall"]) -> None:
         function = self.install_toolkit if verb == "Install" else self.uninstall_toolkit
@@ -123,6 +126,9 @@ class Root:
         with row(align_items="center"):
             self.locked_button(f"{verb} {PSVR2_TOOLKIT_NAME}", partial(function.refresh, f"{verb}ing {PSVR2_TOOLKIT_NAME}"))
             await function("")
+
+    async def check_installed(self) -> None:
+        self.installed = not await Drivers.is_installed_signed_and_newer()
 
     @modifies_toolkit
     async def install_toolkit(self) -> None:
@@ -163,11 +169,11 @@ class Root:
 
     @refreshable_method
     async def check_for_updates(self) -> None:
-        async with self.working():
-            if self.setting_up:
-                return
+        if not self.instantiated:
+            return
 
-            with dialog().on("hide", lambda: update_dialog.clear()) as update_dialog, card(), grid(columns=3).classes("items-center"):
+        async with self.working():
+            with dialog().on("hide") as update_dialog, card(), grid(columns=3).classes("items-center"):
                 release = await self.github.get_latest_release(PSVR2_TOOLKIT_OWNER, PSVR2_TOOLKIT_NAME)
                 async with aiofiles_open(Drivers.installed_path, "rb") as fp:
                     self.show_update(
