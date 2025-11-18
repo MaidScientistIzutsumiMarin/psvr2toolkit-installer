@@ -9,7 +9,8 @@ dependencies = [
   "githubkit",
   "nicegui",
   "pywebview",
-  "signify"
+  "signify",
+  "winloop"
 ]
 dynamic = ["version"]
 

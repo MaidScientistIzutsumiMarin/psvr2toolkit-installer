@@ -14,6 +14,7 @@ from aiofiles.ospath import exists
 from nicegui.binding import bindable_dataclass
 from nicegui.events import ValueChangeEventArguments  # noqa: TC002
 from nicegui.ui import button, card, checkbox, dialog, expansion, grid, label, log, markdown, notification, notify, refreshable_method, row, run, space, spinner, splitter  # pyright: ignore[reportUnknownVariableType]
+from winloop import new_event_loop
 
 from psvr2toolkit_installer import __version__
 from psvr2toolkit_installer.github import CustomGitHub
@@ -201,6 +202,7 @@ def main() -> None:
         dark=None,
         window_size=(650, 500),
         reload=False,
+        loop=new_event_loop,
     )
 
 
