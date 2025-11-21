@@ -5,8 +5,8 @@ pyinstaller.exe `
     --noconfirm `
     --onefile `
     --name psvr2toolkit-installer `
-    --add-binary $SitePackages\githubkit\rest\__init__.py:githubkit\rest `
-    --add-binary $SitePackages\githubkit\versions\v2022_11_28\models\__init__.py:githubkit\versions\v2022_11_28\models `
+    --add-data $SitePackages\githubkit\rest\__init__.py:githubkit\rest `
+    --add-data $SitePackages\githubkit\versions\v2022_11_28\models\__init__.py:githubkit\versions\v2022_11_28\models `
     --hidden-import winloop._noop `
     --collect-data mscerts `
     --collect-data nicegui `
