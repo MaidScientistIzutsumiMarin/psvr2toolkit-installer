@@ -8,6 +8,7 @@ dependencies = [
   "aiofiles",
   "githubkit",
   "nicegui",
+  "pythonnet @ git+https://github.com/pythonnet/pythonnet@python3.14",
   "pywebview",
   "signify",
   "winloop"
@@ -20,6 +21,9 @@ Source = "https://github.com/MaidScientistIzutsumiMarin/psvr2toolkit-installer"
 
 [project.scripts]
 psvr2toolkit-installer = "psvr2toolkit_installer.__main__:main"
+
+[project.optional-dependencies]
+dev = ["pyinstaller"]
 
 [build-system]
 requires = ["flit_core"]
