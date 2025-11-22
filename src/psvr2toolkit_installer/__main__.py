@@ -94,6 +94,13 @@ class Root:
                 work_spinner.set_visibility(False)
 
     async def setup(self) -> None:
+        try:
+            from pyi_splash import close  # pyright: ignore[reportMissingModuleSource] # noqa: PLC0415
+        except ModuleNotFoundError:
+            pass
+        else:
+            close()
+
         await self.check_installed()
 
         with splitter().classes("w-full") as root_splitter:

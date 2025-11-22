@@ -11,6 +11,7 @@ pyinstaller.exe `
     --collect-data mscerts `
     --collect-data nicegui `
     --collect-data signify `
+    --splash Splash.png `
     --optimize 1 `
     --windowed `
     src\psvr2toolkit_installer\__main__.py
