@@ -27,7 +27,10 @@ class Drivers:
         # Signed is true if the installed driver exists, and the signature can be verified.
         if signed := await exists(cls.installed_path):
             async with aiofiles_open(cls.installed_path, "rb") as fp:
-                signed = AuthenticodeFile.from_stream(fp.raw).explain_verify()[0] is AuthenticodeVerificationResult.OK
+                result, error = AuthenticodeFile.from_stream(fp.raw).explain_verify()
+                if error is not None:
+                    raise error
+                signed = result is AuthenticodeVerificationResult.OK
 
         # If the installed driver is signed, and it was modified more recently than the original driver, the installed driver is probably a newer version.
         # Alternatively, if the installed driver is signed, and there is no original driver, the install is normal. In this case, we can just treat it as newer.
