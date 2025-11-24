@@ -1,24 +1,21 @@
+from asyncio import Lock
 from contextlib import asynccontextmanager
-from dataclasses import field
 from functools import partial
-from hashlib import sha256
 from hmac import compare_digest
 from operator import not_
 from sys import exit as sys_exit
 from typing import TYPE_CHECKING, ClassVar, Literal
 from webbrowser import open as webbrowser_open
 
-from aiofiles import open as aiofiles_open
-from aiofiles.os import replace, unlink
-from aiofiles.ospath import exists
-from nicegui.binding import bindable_dataclass
+from nicegui.binding import BindableProperty, bindable_dataclass
 from nicegui.events import ValueChangeEventArguments  # noqa: TC002
 from nicegui.ui import button, card, checkbox, dialog, expansion, grid, label, log, markdown, notification, notify, refreshable_method, row, run, space, spinner, splitter  # pyright: ignore[reportUnknownVariableType]
 from winloop import new_event_loop
 
 from psvr2toolkit_installer import __version__
 from psvr2toolkit_installer.github import CustomGitHub
-from psvr2toolkit_installer.helpers import BindableLock, Drivers, SteamVR
+from psvr2toolkit_installer.steam.drivers import Drivers
+from psvr2toolkit_installer.steam.steamvr import SteamVR
 from psvr2toolkit_installer.vars import PSVR2_APP, PSVR2_TOOLKIT_INSTALLER_NAME, PSVR2_TOOLKIT_INSTALLER_OWNER, PSVR2_TOOLKIT_NAME, PSVR2_TOOLKIT_OWNER
 
 if TYPE_CHECKING:
@@ -29,12 +26,16 @@ if TYPE_CHECKING:
     from nicegui.events import ClickEventArguments, Handler
 
 
+class BindableLock(Lock):
+    _locked = BindableProperty()
+
+
 @bindable_dataclass
 class Root:
     github: ClassVar = CustomGitHub()
     lock: ClassVar = BindableLock()
+    drivers: ClassVar = Drivers()
 
-    installed: bool = field(init=False)
     instantiated = False
 
     @staticmethod
@@ -52,7 +53,7 @@ class Root:
                 self.log.push("Verifying relevant files...")
 
                 try:
-                    if self.installed and not await exists(Drivers.original_path):
+                    if not await self.drivers.validate_files():
                         msg = f"{PSVR2_APP} has invalid files. Please verify its integrity."
                         raise RuntimeError(msg)
 
@@ -64,7 +65,7 @@ class Root:
                     work_notification.spinner = False
                     work_notification.timeout = 5
 
-                    await self.check_installed()
+                    await self.drivers.validate_files()
 
         return wrapper
 
@@ -101,7 +102,7 @@ class Root:
         else:
             close()
 
-        await self.check_installed()
+        await self.drivers.setup()
 
         with splitter().classes("w-full") as root_splitter:
             with root_splitter.before:
@@ -118,7 +119,7 @@ class Root:
                 with row():
                     space()
                     label(f"{PSVR2_TOOLKIT_NAME}:").classes("text-grey")
-                    label().classes("text-secondary").bind_text_from(self, "installed", backward=lambda installed: "Installed" if installed else "Uninstalled")
+                    label().classes("text-secondary").bind_text_from(self.drivers, "status")
 
         self.log = log()
 
@@ -135,34 +136,29 @@ class Root:
             self.locked_button(f"{verb} {PSVR2_TOOLKIT_NAME}", partial(function.refresh, f"{verb}ing {PSVR2_TOOLKIT_NAME}"))
             await function("")
 
-    async def check_installed(self) -> None:
-        self.installed = not await Drivers.is_installed_signed_and_newer()
-
     @modifies_toolkit
     async def install_toolkit(self) -> None:
-        if not self.installed:
-            self.log.push("Copying installed driver...")
-            await replace(Drivers.installed_path, Drivers.original_path)
+        if self.drivers.status == "Uninstalled":
+            self.log.push("Copying current driver...")
+            await self.drivers.copy_original()
 
         self.log.push("Downloading latest release...")
         response = await self.github.download_latest_release(PSVR2_TOOLKIT_OWNER, PSVR2_TOOLKIT_NAME)
 
-        self.log.push("Saving latest release as installed driver...")
-        async with aiofiles_open(Drivers.installed_path, "wb") as fp:
-            await fp.write(response.content)
+        self.log.push("Saving latest release as current driver...")
+        await self.drivers.install_to_current(response.content)
 
     @modifies_toolkit
     async def uninstall_toolkit(self) -> None:
-        if not await exists(Drivers.original_path):
+        if self.drivers.status == "Installed":
+            self.log.push("Replacing current driver with original driver...")
+            await self.drivers.restore_original()
+        elif await self.drivers.original_exists():
+            self.log.push(f"{PSVR2_TOOLKIT_NAME} is not installed. Deleting original driver...")
+            await self.drivers.unlink_original()
+        else:
             msg = f"{PSVR2_TOOLKIT_NAME} is not installed."
             raise RuntimeError(msg)
-
-        if self.installed:
-            self.log.push("Replacing installed driver with original driver...")
-            await replace(Drivers.original_path, Drivers.installed_path)
-        else:
-            self.log.push("Installed driver is newer. Deleting original driver...")
-            await unlink(Drivers.original_path)
 
         self.log.push(f"Please verify the integrity of {PSVR2_APP}'s files through Steam.", classes="text-bold")
 
@@ -183,13 +179,12 @@ class Root:
         async with self.working():
             with dialog().on("hide") as update_dialog, card(), grid(columns=3).classes("items-center"):
                 release = await self.github.get_latest_release(PSVR2_TOOLKIT_OWNER, PSVR2_TOOLKIT_NAME)
-                async with aiofiles_open(Drivers.installed_path, "rb") as fp:
-                    self.show_update(
-                        PSVR2_TOOLKIT_NAME,
-                        release,
-                        partial(self.install_toolkit.refresh, f"Updating {PSVR2_TOOLKIT_NAME}"),
-                        up_to_date=compare_digest("sha256:" + sha256(await fp.read()).hexdigest(), release.assets[0].digest or ""),
-                    )
+                self.show_update(
+                    PSVR2_TOOLKIT_NAME,
+                    release,
+                    partial(self.install_toolkit.refresh, f"Updating {PSVR2_TOOLKIT_NAME}"),
+                    up_to_date=compare_digest(await self.drivers.get_digest(), release.assets[0].digest or ""),
+                )
 
                 release = await self.github.get_latest_release(PSVR2_TOOLKIT_INSTALLER_OWNER, PSVR2_TOOLKIT_INSTALLER_NAME)
                 self.show_update(

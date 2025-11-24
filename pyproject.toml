@@ -4,13 +4,13 @@ description = "An unofficial tool that can install and configure the PlayStation
 readme = "README.md"
 requires-python = ">= 3.14"
 dependencies = [
-  "SteamPathFinder",
   "aiofiles",
   "githubkit",
   "nicegui",
   "pythonnet @ git+https://github.com/pythonnet/pythonnet@python3.14",
   "pywebview",
   "signify",
+  "srctools",
   "winloop"
 ]
 dynamic = ["version"]
