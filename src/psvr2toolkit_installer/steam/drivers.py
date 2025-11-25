@@ -1,6 +1,6 @@
-from dataclasses import field
+from dataclasses import dataclass, field
 from hashlib import sha256
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, Self, cast
 
 from aiofiles import open as aiofiles_open
 from aiofiles.os import replace, unlink
@@ -12,17 +12,34 @@ from psvr2toolkit_installer.steam.paths import get_game_path
 from psvr2toolkit_installer.vars import PSVR2_APP
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from _typeshed import FileDescriptorOrPath, ReadableBuffer
 
 
-@bindable_dataclass
+@dataclass
 class Drivers:
+    current_path: Path
+    original_path: Path
     status: Literal["Installed", "Uninstalled", "Invalid Driver Files"] = field(init=False)
 
-    async def setup(self) -> None:
-        self.current_path = await get_game_path("2580190", PSVR2_APP) / "SteamVR_Plug-In" / "bin" / "win64" / "driver_playstation_vr2.dll"
-        self.original_path = self.current_path.with_name("driver_playstation_vr2_orig.dll")
+    @classmethod
+    async def create(cls) -> Self:
+        path = await get_game_path("2580190", PSVR2_APP) / "SteamVR_Plug-In" / "bin" / "win64"
+
+        # Ok, so. This is all required because of a Pylance(?) regression(?).
+        # First, we maid Drivers a dataclass through an annotation which allows it to construct __init__().
+        # Second, to make status bindable, we then wrap it in a bindable_dataclass. This would normally make the first step unnecessary.
+        #   But making it a dataclass first means we have access to a type that means Drivers but a dataclass, which is lost in this step.
+        # Third, we restore its original typing of Drivers but a dataclass so that all of its attributes are visible to the type checker.
+        # It's silly, but it's just a regression, as we said.
+        self = cast("type[Self]", bindable_dataclass(cls))(
+            path / "driver_playstation_vr2.dll",
+            path / "driver_playstation_vr2_orig.dll",
+        )
+
         await self.validate_files()
+        return self
 
     ### Read ###
 
