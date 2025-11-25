@@ -9,7 +9,7 @@ from nicegui.binding import bindable_dataclass
 from signify.authenticode import AuthenticodeFile, AuthenticodeVerificationResult
 
 from psvr2toolkit_installer.steam.paths import get_game_path
-from psvr2toolkit_installer.vars import PSVR2_APP, PSVR2_APP_ID
+from psvr2toolkit_installer.vars import PSVR2_APP
 
 if TYPE_CHECKING:
     from _typeshed import FileDescriptorOrPath, ReadableBuffer
@@ -20,7 +20,7 @@ class Drivers:
     status: Literal["Installed", "Uninstalled", "Invalid Driver Files"] = field(init=False)
 
     async def setup(self) -> None:
-        self.current_path = await get_game_path(PSVR2_APP_ID, PSVR2_APP) / "SteamVR_Plug-In" / "bin" / "win64" / "driver_playstation_vr2.dll"
+        self.current_path = await get_game_path("2580190", PSVR2_APP) / "SteamVR_Plug-In" / "bin" / "win64" / "driver_playstation_vr2.dll"
         self.original_path = self.current_path.with_name("driver_playstation_vr2_orig.dll")
         await self.validate_files()
 
