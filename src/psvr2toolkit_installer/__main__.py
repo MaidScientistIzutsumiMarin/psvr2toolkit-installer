@@ -4,10 +4,10 @@ from functools import partial
 from hmac import compare_digest
 from operator import not_
 from sys import exit as sys_exit
-from typing import TYPE_CHECKING, ClassVar, Literal
+from typing import TYPE_CHECKING, Literal
 from webbrowser import open as webbrowser_open
 
-from nicegui.binding import BindableProperty, bindable_dataclass
+from nicegui.binding import BindableProperty
 from nicegui.events import ValueChangeEventArguments  # noqa: TC002
 from nicegui.ui import button, card, checkbox, dialog, expansion, grid, label, log, markdown, notification, notify, refreshable_method, row, run, space, spinner, splitter  # pyright: ignore[reportUnknownVariableType]
 from winloop import new_event_loop
@@ -30,14 +30,7 @@ class BindableLock(Lock):
     _locked = BindableProperty()
 
 
-@bindable_dataclass
 class Root:
-    github: ClassVar = CustomGitHub()
-    lock: ClassVar = BindableLock()
-    drivers: ClassVar = Drivers()
-
-    instantiated = False
-
     @staticmethod
     def modifies_toolkit(function: Callable[[Root], Awaitable[object]]) -> refreshable_method[Root, [str], CoroutineType[object, object, None]]:
         @refreshable_method
@@ -69,18 +62,6 @@ class Root:
 
         return wrapper
 
-    @classmethod
-    def locked_button(cls, text: str, on_click: Handler[ClickEventArguments], backward: Callable[[bool], bool] = not_) -> button:
-        return button(text, on_click=on_click).bind_enabled_from(cls.lock, "_locked", backward)
-
-    @classmethod
-    def show_update(cls, name: str, release: Release, on_click: Handler[ClickEventArguments], *, up_to_date: bool) -> None:
-        label(name).classes("font-bold")
-        label(release.tag_name).classes("text-secondary")
-        cls.locked_button("Update", on_click, lambda locked: not (locked or up_to_date))
-        with expansion("Changelog").classes("col-span-full"):
-            markdown(release.body or "No changelog provided.")
-
     @asynccontextmanager
     async def working(self) -> AsyncGenerator[None]:
         async with self.lock:
@@ -93,6 +74,12 @@ class Root:
                 raise
             finally:
                 work_spinner.set_visibility(False)
+
+    def __init__(self) -> None:
+        self.lock = BindableLock()
+        self.github = CustomGitHub()
+        self.drivers = Drivers()
+        self.instantiated = False
 
     async def setup(self) -> None:
         try:
@@ -135,6 +122,9 @@ class Root:
         with row(align_items="center"):
             self.locked_button(f"{verb} {PSVR2_TOOLKIT_NAME}", partial(function.refresh, f"{verb}ing {PSVR2_TOOLKIT_NAME}"))
             await function("")
+
+    def locked_button(self, text: str, on_click: Handler[ClickEventArguments], backward: Callable[[bool], bool] = not_) -> button:
+        return button(text, on_click=on_click).bind_enabled_from(self.lock, "_locked", backward)
 
     @modifies_toolkit
     async def install_toolkit(self) -> None:
@@ -195,6 +185,13 @@ class Root:
                 )
 
             update_dialog.open()
+
+    def show_update(self, name: str, release: Release, on_click: Handler[ClickEventArguments], *, up_to_date: bool) -> None:
+        label(name).classes("font-bold")
+        label(release.tag_name).classes("text-secondary")
+        self.locked_button("Update", on_click, lambda locked: not (locked or up_to_date))
+        with expansion("Changelog").classes("col-span-full"):
+            markdown(release.body or "No changelog provided.")
 
 
 def main() -> None:
