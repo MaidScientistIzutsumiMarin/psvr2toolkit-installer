@@ -31,6 +31,46 @@ class BindableLock(Lock):
 
 
 class Root:
+    def __init__(self) -> None:
+        self.lock = BindableLock()
+        self.github = CustomGitHub()
+        self.instantiated: bool = False
+
+    async def setup(self) -> None:
+        try:
+            from pyi_splash import close  # pyright: ignore[reportMissingModuleSource] # noqa: PLC0415
+        except ModuleNotFoundError:
+            pass
+        else:
+            close()
+
+        self.drivers = await Drivers.create()
+
+        with splitter().classes("w-full") as root_splitter:
+            with root_splitter.before:
+                await self.create_modification_button("Install")
+                await self.create_modification_button("Uninstall")
+
+            with root_splitter.after:
+                checkbox(
+                    "Enable Experimental Eyelid Estimation",
+                    value=await SteamVR.is_eyelid_estimation_enabled(),
+                    on_change=self.set_eyelid_estimation,
+                )
+
+                with row():
+                    space()
+                    label(f"{PSVR2_TOOLKIT_NAME}:").classes("text-grey")
+                    label().classes("text-secondary").bind_text_from(self.drivers, "status")
+
+        self.log = log()
+
+        with row(align_items="center").classes("w-full"):
+            self.locked_button("Check for Updates", self.check_for_updates.refresh)
+            await self.check_for_updates()
+
+        self.instantiated = True
+
     @staticmethod
     def modifies_toolkit(function: Callable[[Root], Awaitable[object]]) -> refreshable_method[Root, [str], CoroutineType[object, object, None]]:
         @refreshable_method
@@ -74,47 +114,6 @@ class Root:
                 raise
             finally:
                 work_spinner.set_visibility(False)
-
-    def __init__(self) -> None:
-        self.lock = BindableLock()
-        self.github = CustomGitHub()
-        self.drivers = Drivers()
-        self.instantiated = False
-
-    async def setup(self) -> None:
-        try:
-            from pyi_splash import close  # pyright: ignore[reportMissingModuleSource] # noqa: PLC0415
-        except ModuleNotFoundError:
-            pass
-        else:
-            close()
-
-        await self.drivers.setup()
-
-        with splitter().classes("w-full") as root_splitter:
-            with root_splitter.before:
-                await self.create_modification_button("Install")
-                await self.create_modification_button("Uninstall")
-
-            with root_splitter.after:
-                checkbox(
-                    "Enable Experimental Eyelid Estimation",
-                    value=await SteamVR.is_eyelid_estimation_enabled(),
-                    on_change=self.set_eyelid_estimation,
-                )
-
-                with row():
-                    space()
-                    label(f"{PSVR2_TOOLKIT_NAME}:").classes("text-grey")
-                    label().classes("text-secondary").bind_text_from(self.drivers, "status")
-
-        self.log = log()
-
-        with row(align_items="center").classes("w-full"):
-            self.locked_button("Check for Updates", self.check_for_updates.refresh)
-            await self.check_for_updates()
-
-        self.instantiated = True
 
     async def create_modification_button(self, verb: Literal["Install", "Uninstall"]) -> None:
         function = self.install_toolkit if verb == "Install" else self.uninstall_toolkit
