@@ -1,6 +1,6 @@
-from dataclasses import field
+from dataclasses import dataclass, field
 from hashlib import sha256
-from typing import TYPE_CHECKING, Literal, Self
+from typing import TYPE_CHECKING, Literal, Self, cast
 
 from aiofiles import open as aiofiles_open
 from aiofiles.os import replace, unlink
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from _typeshed import FileDescriptorOrPath, ReadableBuffer
 
 
-@bindable_dataclass
+@dataclass
 class Drivers:
     current_path: Path
     original_path: Path
@@ -33,7 +33,7 @@ class Drivers:
         #   But making it a dataclass first means we have access to a type that means Drivers but a dataclass, which is lost in this step.
         # Third, we restore its original typing of Drivers but a dataclass so that all of its attributes are visible to the type checker.
         # It's silly, but it's just a regression, as we said.
-        self = cls(
+        self = cast("type[Self]", bindable_dataclass(cls))(
             path / "driver_playstation_vr2.dll",
             path / "driver_playstation_vr2_orig.dll",
         )
